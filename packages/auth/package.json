@@ -1,0 +1,30 @@
+{
+  "name": "@urantia/auth",
+  "version": "0.1.0",
+  "description": "Authentication client for Urantia apps (accounts.urantiahub.com)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["urantia", "auth", "oauth", "sdk"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/urantiahub/urantia-dev-sdks",
+    "directory": "packages/auth"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
