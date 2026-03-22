@@ -1,8 +1,9 @@
-import type { ParagraphResponse, ParagraphContextResponse } from "../types.js";
+import type { ParagraphResponse, ParagraphContextResponse, SupportedLanguage } from "../types.js";
 
 interface ParagraphOptions {
   include?: "entities";
   format?: "rag";
+  lang?: SupportedLanguage;
 }
 
 export class ParagraphsEndpoint {
@@ -42,6 +43,7 @@ export class ParagraphsEndpoint {
     if (options?.include) params.set("include", options.include);
     if (options?.format) params.set("format", options.format);
     if (options?.window != null) params.set("window", String(options.window));
+    if (options?.lang) params.set("lang", options.lang);
     const qs = params.toString();
     const res = await fetch(
       `${this.baseUrl}/paragraphs/${encodeURIComponent(ref)}/context${qs ? `?${qs}` : ""}`,
@@ -57,6 +59,7 @@ function buildParams(options?: ParagraphOptions): string {
   const params = new URLSearchParams();
   if (options.include) params.set("include", options.include);
   if (options.format) params.set("format", options.format);
+  if (options.lang) params.set("lang", options.lang);
   const qs = params.toString();
   return qs ? `?${qs}` : "";
 }

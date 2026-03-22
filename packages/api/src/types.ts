@@ -1,3 +1,18 @@
+// ─── Languages ───
+
+export type SupportedLanguage = "eng" | "es" | "fr" | "pt" | "de" | "ko";
+
+export interface Language {
+  code: string;
+  name: string;
+  entityCount: number;
+  paragraphCount: number;
+}
+
+export interface LanguagesResponse {
+  data: Language[];
+}
+
 // ─── Common ───
 
 export interface PaginationMeta {
@@ -75,6 +90,7 @@ export interface Paragraph {
   partId: string;
   text: string;
   htmlText: string;
+  language?: string;
   labels: string[];
   audio: Record<string, unknown> | null;
   entities?: EntityMention[];
@@ -110,6 +126,7 @@ export interface Entity {
   aliases: string[] | null;
   seeAlso: string[] | null;
   citationCount: number;
+  language?: string;
 }
 
 export interface EntityMention {

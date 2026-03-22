@@ -32,6 +32,10 @@ export type {
   SemanticSearchParams,
   SemanticSearchResult,
   SemanticSearchResponse,
+  // Languages
+  SupportedLanguage,
+  Language,
+  LanguagesResponse,
   // Audio
   AudioResponse,
   // Citation

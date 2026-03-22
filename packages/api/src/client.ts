@@ -8,6 +8,7 @@ import { AudioEndpoint } from "./endpoints/audio.js";
 import { CiteEndpoint } from "./endpoints/cite.js";
 import { EmbeddingsEndpoint } from "./endpoints/embeddings.js";
 import { MeEndpoint } from "./endpoints/me.js";
+import { LanguagesEndpoint } from "./endpoints/languages.js";
 
 const DEFAULT_BASE_URL = "https://api.urantia.dev";
 
@@ -31,6 +32,8 @@ export class UrantiaAPI {
   readonly cite: CiteEndpoint;
   /** Vector embeddings for paragraphs. */
   readonly embeddings: EmbeddingsEndpoint;
+  /** Available languages and translation progress. */
+  readonly languages: LanguagesEndpoint;
   /** Authenticated user endpoints (profile, bookmarks, notes, reading progress, preferences). Requires a token. */
   readonly me: MeEndpoint;
 
@@ -52,6 +55,7 @@ export class UrantiaAPI {
     this.audio = new AudioEndpoint(this.baseUrl, headers);
     this.cite = new CiteEndpoint(this.baseUrl, headers);
     this.embeddings = new EmbeddingsEndpoint(this.baseUrl, headers);
+    this.languages = new LanguagesEndpoint(this.baseUrl, headers);
     this.me = new MeEndpoint(this.baseUrl, headers);
   }
 }

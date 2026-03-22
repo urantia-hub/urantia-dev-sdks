@@ -4,6 +4,7 @@ import type {
   EntityDetailResponse,
   EntityParagraphsResponse,
   PaginationParams,
+  SupportedLanguage,
 } from "../types.js";
 
 export class EntitiesEndpoint {
@@ -14,13 +15,14 @@ export class EntitiesEndpoint {
 
   /** List entities with optional filtering. */
   async list(
-    options?: PaginationParams & { type?: EntityType; q?: string }
+    options?: PaginationParams & { type?: EntityType; q?: string; lang?: SupportedLanguage }
   ): Promise<EntitiesListResponse> {
     const params = new URLSearchParams();
     if (options?.page != null) params.set("page", String(options.page));
     if (options?.limit != null) params.set("limit", String(options.limit));
     if (options?.type) params.set("type", options.type);
     if (options?.q) params.set("q", options.q);
+    if (options?.lang) params.set("lang", options.lang);
     const qs = params.toString();
     const res = await fetch(
       `${this.baseUrl}/entities${qs ? `?${qs}` : ""}`,
@@ -31,8 +33,11 @@ export class EntitiesEndpoint {
   }
 
   /** Get a single entity by ID. */
-  async get(id: string): Promise<EntityDetailResponse> {
-    const res = await fetch(`${this.baseUrl}/entities/${id}`, {
+  async get(id: string, options?: { lang?: SupportedLanguage }): Promise<EntityDetailResponse> {
+    const params = new URLSearchParams();
+    if (options?.lang) params.set("lang", options.lang);
+    const qs = params.toString();
+    const res = await fetch(`${this.baseUrl}/entities/${id}${qs ? `?${qs}` : ""}`, {
       headers: this.headers(),
     });
     if (!res.ok) throw await toError(res);
@@ -42,11 +47,12 @@ export class EntitiesEndpoint {
   /** Get paragraphs that mention an entity. */
   async paragraphs(
     id: string,
-    options?: PaginationParams
+    options?: PaginationParams & { lang?: SupportedLanguage }
   ): Promise<EntityParagraphsResponse> {
     const params = new URLSearchParams();
     if (options?.page != null) params.set("page", String(options.page));
     if (options?.limit != null) params.set("limit", String(options.limit));
+    if (options?.lang) params.set("lang", options.lang);
     const qs = params.toString();
     const res = await fetch(
       `${this.baseUrl}/entities/${id}/paragraphs${qs ? `?${qs}` : ""}`,
