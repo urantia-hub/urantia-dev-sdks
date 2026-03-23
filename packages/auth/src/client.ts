@@ -70,7 +70,9 @@ export class UrantiaAuth {
     const mode = options?.mode ?? "popup";
 
     // Store PKCE verifier and state for callback
-    sessionStorage.setItem(
+    // Use localStorage (not sessionStorage) so the data survives magic-link
+    // emails that open in a new browser tab.
+    localStorage.setItem(
       "urantia_auth_pkce",
       JSON.stringify({ codeVerifier, state })
     );
@@ -155,12 +157,12 @@ export class UrantiaAuth {
     }
 
     // Verify state and retrieve PKCE verifier
-    const stored = sessionStorage.getItem("urantia_auth_pkce");
+    const stored = localStorage.getItem("urantia_auth_pkce");
     if (!stored) {
       throw new Error("No PKCE data found. Was signIn() called first?");
     }
     const { codeVerifier, state } = JSON.parse(stored);
-    sessionStorage.removeItem("urantia_auth_pkce");
+    localStorage.removeItem("urantia_auth_pkce");
 
     if (returnedState && returnedState !== state) {
       throw new Error("State mismatch — possible CSRF attack.");
