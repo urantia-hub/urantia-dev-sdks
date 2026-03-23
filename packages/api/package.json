@@ -1,6 +1,6 @@
 {
   "name": "@urantia/api",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Typed client for the Urantia Papers API (api.urantia.dev)",
   "type": "module",
   "main": "./dist/index.js",
@@ -11,13 +11,20 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["urantia", "api", "sdk", "urantia-book"],
+  "keywords": [
+    "urantia",
+    "api",
+    "sdk",
+    "urantia-book"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -26,5 +33,8 @@
   },
   "devDependencies": {
     "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@urantia/api": "^0.2.1"
   }
 }
