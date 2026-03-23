@@ -23,11 +23,17 @@ export class ParagraphsEndpoint {
     return res.json();
   }
 
-  /** Get a random paragraph. */
-  async random(options?: ParagraphOptions): Promise<ParagraphResponse> {
-    const params = buildParams(options);
+  /** Get a random paragraph. Optionally filter by text length (character count). */
+  async random(options?: ParagraphOptions & { minLength?: number; maxLength?: number }): Promise<ParagraphResponse> {
+    const params = new URLSearchParams();
+    if (options?.include) params.set("include", options.include);
+    if (options?.format) params.set("format", options.format);
+    if (options?.lang) params.set("lang", options.lang);
+    if (options?.minLength != null) params.set("minLength", String(options.minLength));
+    if (options?.maxLength != null) params.set("maxLength", String(options.maxLength));
+    const qs = params.toString();
     const res = await fetch(
-      `${this.baseUrl}/paragraphs/random${params}`,
+      `${this.baseUrl}/paragraphs/random${qs ? `?${qs}` : ""}`,
       { headers: this.headers() }
     );
     if (!res.ok) throw await toError(res);
