@@ -57,6 +57,12 @@ export interface TocResponse {
 
 // ─── Papers ───
 
+export interface VideoVariant {
+  mp4: string;
+  thumbnail: string;
+  duration: number;
+}
+
 export interface Paper {
   id: string;
   title: string;
@@ -64,6 +70,7 @@ export interface Paper {
   partId: string;
   partTitle: string;
   paragraphCount: number;
+  video: Record<string, VideoVariant> | null;
 }
 
 export interface PapersListResponse {
