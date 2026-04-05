@@ -184,11 +184,29 @@ export class UrantiaAuth {
     this.notifyListeners();
   }
 
-  /** Get the current session, or null if not signed in. */
+  /**
+   * Get the current session, or null if not signed in.
+   * If the access token is expired or near expiry (within 5 minutes),
+   * automatically attempts to refresh using the refresh token.
+   */
   getSession(): Session | null {
-    if (this.session && new Date(this.session.expiresAt) < new Date()) {
-      this.signOut();
-      return null;
+    if (!this.session) return null;
+
+    const expiresAt = new Date(this.session.expiresAt);
+    const fiveMinFromNow = new Date(Date.now() + 5 * 60 * 1000);
+
+    if (expiresAt < fiveMinFromNow) {
+      // Token expired or expiring soon — trigger background refresh
+      // Return null for now; the refresh will notify listeners when done
+      if (this.session.refreshToken) {
+        this.refreshSession().catch(() => {
+          this.signOut();
+        });
+      } else {
+        this.signOut();
+      }
+      // If expired, return null. If just near-expiry, return current session.
+      if (expiresAt < new Date()) return null;
     }
     return this.session;
   }
@@ -196,6 +214,51 @@ export class UrantiaAuth {
   /** Get the current access token, or null if not signed in. */
   getToken(): string | null {
     return this.getSession()?.accessToken ?? null;
+  }
+
+  /**
+   * Refresh the session using the stored refresh token.
+   * Returns the new session, or throws if refresh fails.
+   */
+  async refreshSession(): Promise<Session> {
+    if (!this.session?.refreshToken) {
+      throw new Error("No refresh token available.");
+    }
+
+    const res = await fetch(`${this.apiUrl}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        refreshToken: this.session.refreshToken,
+        appId: this.appId,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      // If refresh fails (e.g. token revoked), sign out
+      this.signOut();
+      throw new Error(
+        err?.detail || err?.title || `Token refresh failed: ${res.status}`
+      );
+    }
+
+    const { data } = await res.json();
+    const session: Session = {
+      user: {
+        id: data.userId,
+        email: data.email ?? null,
+        scopes: data.scopes ?? [],
+      },
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken,
+      expiresAt: data.expiresAt,
+    };
+
+    this.session = session;
+    this.persistSession();
+    this.notifyListeners();
+    return session;
   }
 
   /** Listen for auth state changes (sign-in / sign-out). Returns an unsubscribe function. */
@@ -242,6 +305,7 @@ export class UrantiaAuth {
         scopes: data.scopes ?? [],
       },
       accessToken: data.accessToken,
+      refreshToken: data.refreshToken,
       expiresAt: data.expiresAt,
     };
 

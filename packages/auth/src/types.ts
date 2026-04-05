@@ -20,6 +20,7 @@ export interface User {
 export interface Session {
   user: User;
   accessToken: string;
+  refreshToken: string;
   expiresAt: string;
 }
 

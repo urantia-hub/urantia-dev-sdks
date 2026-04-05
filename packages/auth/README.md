@@ -107,16 +107,74 @@ const bookmarks = await api.me.bookmarks.list()
 |--------|-------------|
 | `signIn(options?)` | Start OAuth flow (popup/redirect/server) |
 | `handleCallback(url?)` | Complete redirect flow on callback page |
+| `refreshSession()` | Refresh the access token using the stored refresh token |
 | `signOut()` | Clear session |
-| `getSession()` | Get current session or null |
+| `getSession()` | Get current session or null (auto-refreshes if near expiry) |
 | `getToken()` | Get current access token or null |
 | `onAuthStateChange(cb)` | Subscribe to auth changes (returns unsubscribe fn) |
+
+### Token Refresh
+
+Sessions include a refresh token (30-day expiry). `getSession()` automatically triggers a background refresh when the access token is within 5 minutes of expiry. You can also refresh manually:
+
+```typescript
+const newSession = await auth.refreshSession()
+```
+
+Refresh tokens are **one-time-use** with rotation — each refresh returns a new refresh token. If a refresh token is reused (indicating potential theft), all sessions for that user+app are revoked.
+
+## React Native / Expo
+
+The browser-based SDK uses `localStorage` and `window.open()` which aren't available in React Native. For Expo apps, implement the PKCE flow with native equivalents:
+
+```typescript
+import * as WebBrowser from 'expo-web-browser'
+import * as Crypto from 'expo-crypto'
+import * as SecureStore from 'expo-secure-store'
+
+// 1. Generate PKCE challenge
+const codeVerifier = Crypto.getRandomBytes(32)
+  .reduce((s, b) => s + b.toString(16).padStart(2, '0'), '')
+const digest = await Crypto.digestStringAsync(
+  Crypto.CryptoDigestAlgorithm.SHA256,
+  codeVerifier
+)
+const codeChallenge = btoa(digest)
+  .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+
+// 2. Open auth session
+const state = Crypto.randomUUID()
+const result = await WebBrowser.openAuthSessionAsync(
+  `https://accounts.urantiahub.com/login?app_id=YOUR_APP_ID&redirect_uri=yourapp://auth/callback&state=${state}&code_challenge=${codeChallenge}`,
+  'yourapp://auth/callback'
+)
+
+// 3. Exchange code for tokens
+if (result.type === 'success') {
+  const url = new URL(result.url)
+  const code = url.searchParams.get('code')
+
+  const res = await fetch('https://api.urantia.dev/auth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, appId: 'YOUR_APP_ID', codeVerifier }),
+  })
+  const { data } = await res.json()
+  // data.accessToken, data.refreshToken, data.expiresAt
+
+  // 4. Store securely
+  await SecureStore.setItemAsync('session', JSON.stringify(data))
+}
+```
+
+**Register your app** with a custom URL scheme redirect URI (e.g. `yourapp://auth/callback`) at [accounts.urantiahub.com/apps](https://accounts.urantiahub.com/apps).
 
 ## Security
 
 - Uses **PKCE** (Proof Key for Code Exchange) for all browser flows
-- Stores sessions in `localStorage` with expiration checking
+- Stores sessions in `localStorage` (browser) or `expo-secure-store` (React Native) with expiration checking
 - CSRF protection via `state` parameter
+- **Refresh token rotation** with theft detection
 - Never stores app secrets in the browser
 
 ## License
