@@ -71,6 +71,18 @@ export interface Paper {
   partTitle: string;
   paragraphCount: number;
   video: Record<string, VideoVariant> | null;
+  /**
+   * Paper-level aggregate of the most-referenced named entities in this paper,
+   * sorted by paragraph citation frequency and tier-ranked (beings/places/
+   * concepts before orders/races/religions). Only present when the request
+   * includes `topEntities` (alone or combined with `entities`).
+   */
+  topEntities?: TopEntity[];
+}
+
+export interface TopEntity extends EntityMention {
+  /** Number of paragraphs in the paper that cite this entity. */
+  count: number;
 }
 
 export interface PapersListResponse {

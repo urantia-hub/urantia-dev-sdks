@@ -20,6 +20,19 @@ const api = new UrantiaAPI()
 // List all papers
 const { data: papers } = await api.papers.list()
 
+// List papers with the top entities cited in each
+const { data: papersWithTop } = await api.papers.list({ include: 'topEntities' })
+// papersWithTop[0].topEntities → [{ id, name, type, count }, ...]
+
+// Get a single paper with its paragraphs
+const { data } = await api.papers.get('1')
+
+// Get a paper with entity mentions per paragraph + paper-level topEntities
+const { data } = await api.papers.get('1', { include: 'entities' })
+
+// Get just the paper-level topEntities (lighter payload, no per-paragraph mentions)
+const { data } = await api.papers.get('1', { include: 'topEntities' })
+
 // Get a specific paragraph
 const { data: paragraph } = await api.paragraphs.get('2:0.1')
 
@@ -60,8 +73,8 @@ await api.me.preferences.update({ theme: 'dark', fontSize: 16 })
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `api.toc.get()` | GET | Full table of contents |
-| `api.papers.list()` | GET | All 197 papers |
-| `api.papers.get(id)` | GET | Paper with paragraphs |
+| `api.papers.list(opts?)` | GET | All 197 papers. Pass `{ include: 'topEntities' }` to attach per-paper top-entity aggregates. |
+| `api.papers.get(id, opts?)` | GET | Paper with paragraphs. Pass `{ include: 'entities' \| 'topEntities' \| 'entities,topEntities' }`. |
 | `api.paragraphs.get(ref)` | GET | Paragraph by reference |
 | `api.paragraphs.random()` | GET | Random paragraph |
 | `api.paragraphs.context(ref)` | GET | Paragraph with surrounding context |
