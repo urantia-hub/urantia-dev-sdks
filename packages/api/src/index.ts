@@ -1,4 +1,5 @@
 export { UrantiaAPI } from "./client.js";
+export type { PaperInclude, PaperListInclude } from "./endpoints/papers.js";
 export type {
   // Options
   UrantiaAPIOptions,
@@ -12,6 +13,7 @@ export type {
   TocResponse,
   // Papers
   Paper,
+  TopEntity,
   PapersListResponse,
   PaperDetailResponse,
   // Paragraphs

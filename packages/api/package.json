@@ -1,6 +1,6 @@
 {
   "name": "@urantia/api",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Typed client for the Urantia Papers API (api.urantia.dev)",
   "type": "module",
   "main": "./dist/index.js",
