@@ -95,6 +95,50 @@ export interface PaperDetailResponse {
   };
 }
 
+// ─── Parallels (cross-references) ───
+
+/**
+ * One Bible chunk semantically related to a Urantia paragraph.
+ * Returned inline on `?include=bibleParallels` and inside Bible-side
+ * responses where appropriate.
+ */
+export interface BibleParallel {
+  /** OSIS-style chunk id, e.g. "Gen.1.1-2". */
+  chunkId: string;
+  /** Display reference, e.g. "Genesis 1:1-2". */
+  reference: string;
+  /** OSIS book code, e.g. "Gen". */
+  bookCode: string;
+  chapter: number;
+  verseStart: number;
+  verseEnd: number;
+  text: string;
+  /** Cosine similarity, 0..1. */
+  similarity: number;
+  /** 1..10 within the source. */
+  rank: number;
+  /** Provenance label. "semantic" today; future curated layers (e.g. Faw's Paramony) would be tagged differently. */
+  source: string;
+  embeddingModel: string;
+}
+
+/**
+ * One Urantia paragraph semantically related to either another UB paragraph
+ * (via `?include=urantiaParallels`) or to a Bible chunk (via `/bible/.../urantia-parallels` or Bible search).
+ */
+export interface UrantiaParallel {
+  id: string;
+  standardReferenceId: string;
+  paperId: string;
+  paperTitle: string;
+  sectionTitle: string | null;
+  text: string;
+  similarity: number;
+  rank: number;
+  source: string;
+  embeddingModel: string;
+}
+
 // ─── Paragraphs ───
 
 export interface Paragraph {
@@ -112,8 +156,22 @@ export interface Paragraph {
   language?: string;
   labels: string[];
   audio: Record<string, unknown> | null;
+  /** Present when the request includes `entities`. */
   entities?: EntityMention[];
+  /** Present when the request includes `bibleParallels`. */
+  bibleParallels?: BibleParallel[];
+  /** Present when the request includes `urantiaParallels`. */
+  urantiaParallels?: UrantiaParallel[];
 }
+
+/**
+ * Comma-separated includes accepted on most paragraph endpoints. Pass as a
+ * single string e.g. `"entities,urantiaParallels"`.
+ */
+export type ParagraphInclude =
+  | "entities"
+  | "bibleParallels"
+  | "urantiaParallels";
 
 export interface ParagraphResponse {
   data: Paragraph;
@@ -177,7 +235,8 @@ export interface SearchParams {
   limit?: number;
   paperId?: string;
   partId?: string;
-  include?: "entities";
+  /** Comma-separated string of any combination of "entities", "bibleParallels", "urantiaParallels". */
+  include?: string;
 }
 
 /** Search results are flat paragraph objects with an additional `rank` field. */
@@ -196,7 +255,8 @@ export interface SemanticSearchParams {
   limit?: number;
   paperId?: string;
   partId?: string;
-  include?: "entities";
+  /** Comma-separated string. Same accepted values as SearchParams.include. */
+  include?: string;
 }
 
 export type SemanticSearchResult = Paragraph & {
@@ -212,8 +272,9 @@ export interface SemanticSearchResponse {
 
 export interface AudioResponse {
   data: {
-    paragraphId: string;
-    audio: Record<string, unknown>;
+    /** Paragraph globalId, e.g. "1:2.0.1". */
+    id: string;
+    audio: Record<string, unknown> | null;
   };
 }
 
@@ -231,11 +292,121 @@ export interface CitationResponse {
 
 // ─── Embeddings ───
 
-export interface EmbeddingsResponse {
+export type EmbeddingModel = "small" | "large";
+
+export interface EmbeddingResponse {
   data: {
-    ref: string;
+    standardReferenceId: string;
+    /** Underlying model id, e.g. "text-embedding-3-small". */
+    model: string;
+    /** Vector length, e.g. 1536 for small, 3072 for large. */
+    dimensions: number;
     embedding: number[];
-  }[];
+  };
+}
+
+export interface EmbeddingsExportResponse {
+  data: { standardReferenceId: string; embedding: number[] }[];
+  model: string;
+  dimensions: number;
+}
+
+// ─── Bible ───
+
+export type BibleCanon = "ot" | "deuterocanon" | "nt";
+
+export interface BibleBook {
+  bookCode: string;
+  bookName: string;
+  fullName: string;
+  abbr: string;
+  bookOrder: number;
+  canon: BibleCanon;
+  chapterCount: number;
+  verseCount: number;
+}
+
+export interface BibleVerse {
+  /** OSIS verse id, e.g. "Gen.1.1". */
+  id: string;
+  /** Display reference, e.g. "Genesis 1:1". */
+  reference: string;
+  bookCode: string;
+  bookName: string;
+  bookOrder: number;
+  canon: BibleCanon;
+  chapter: number;
+  verse: number;
+  text: string;
+  translation: string;
+}
+
+export interface BibleChapter {
+  bookCode: string;
+  bookName: string;
+  canon: BibleCanon;
+  chapter: number;
+  verses: BibleVerse[];
+}
+
+export interface BibleBooksResponse {
+  data: BibleBook[];
+}
+
+export interface BibleBookResponse {
+  data: BibleBook;
+}
+
+export interface BibleChapterResponse {
+  data: BibleChapter;
+}
+
+export interface BibleVerseResponse {
+  data: BibleVerse;
+}
+
+/** GET /bible/{bookCode}/{chapter}/{verse}/urantia-parallels */
+export interface BibleVerseUrantiaParallelsResponse {
+  data: {
+    verse: BibleVerse;
+    chunk: {
+      id: string;
+      reference: string;
+      verseStart: number;
+      verseEnd: number;
+      text: string;
+    };
+    urantiaParallels: UrantiaParallel[];
+  };
+}
+
+export interface BibleSemanticSearchParams {
+  q: string;
+  page?: number;
+  limit?: number;
+  canon?: BibleCanon;
+  bookCode?: string;
+  /** How many UB paragraphs to attach per chunk (0..10, default 3, set 0 to suppress). */
+  urantiaParallelLimit?: number;
+}
+
+export interface BibleSemanticSearchResult {
+  id: string;
+  reference: string;
+  bookCode: string;
+  bookName: string;
+  canon: BibleCanon;
+  chapter: number;
+  verseStart: number;
+  verseEnd: number;
+  text: string;
+  similarity: number;
+  urantiaParallels: UrantiaParallel[];
+}
+
+export interface BibleSemanticSearchResponse {
+  data: BibleSemanticSearchResult[];
+  meta: PaginationMeta;
 }
 
 // ─── Me (Authenticated) ───

@@ -1,7 +1,15 @@
-import type { ParagraphResponse, ParagraphContextResponse, SupportedLanguage } from "../types.js";
+import type {
+  ParagraphResponse,
+  ParagraphContextResponse,
+  SupportedLanguage,
+} from "../types.js";
 
 interface ParagraphOptions {
-  include?: "entities";
+  /**
+   * Comma-separated string of any combination of `entities`, `bibleParallels`,
+   * `urantiaParallels`. Example: `"entities,bibleParallels,urantiaParallels"`.
+   */
+  include?: string;
   format?: "rag";
   lang?: SupportedLanguage;
 }

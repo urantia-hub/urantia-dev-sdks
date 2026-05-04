@@ -18,8 +18,12 @@ export type {
   PaperDetailResponse,
   // Paragraphs
   Paragraph,
+  ParagraphInclude,
   ParagraphResponse,
   ParagraphContextResponse,
+  // Parallels (cross-references)
+  BibleParallel,
+  UrantiaParallel,
   // Entities
   EntityType,
   Entity,
@@ -44,7 +48,22 @@ export type {
   CitationStyle,
   CitationResponse,
   // Embeddings
-  EmbeddingsResponse,
+  EmbeddingModel,
+  EmbeddingResponse,
+  EmbeddingsExportResponse,
+  // Bible
+  BibleCanon,
+  BibleBook,
+  BibleVerse,
+  BibleChapter,
+  BibleBooksResponse,
+  BibleBookResponse,
+  BibleChapterResponse,
+  BibleVerseResponse,
+  BibleVerseUrantiaParallelsResponse,
+  BibleSemanticSearchParams,
+  BibleSemanticSearchResult,
+  BibleSemanticSearchResponse,
   // Me (Authenticated)
   User,
   UserResponse,

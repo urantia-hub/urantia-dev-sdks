@@ -41,6 +41,32 @@ const { data: results } = await api.search.fullText('divine love')
 
 // Semantic search
 const { data: results } = await api.search.semantic('the nature of God')
+
+// Cross-references — all five surfaces
+// 1. UB paragraph → UB paragraphs
+const { data: para } = await api.paragraphs.get('1:0.1', { include: 'urantiaParallels' })
+para.urantiaParallels // top-10 most-similar UB paragraphs
+
+// 2. UB paragraph → Bible verses
+const { data: para2 } = await api.paragraphs.get('1:0.1', { include: 'bibleParallels' })
+para2.bibleParallels // top-10 nearest Bible chunks
+
+// 3. Bible verse → UB paragraphs
+const { data: bcv } = await api.bible.urantiaParallels('Matt', 5, 3)
+bcv.urantiaParallels // top-10 UB paragraphs for Matt 5:3
+
+// 4. Free-form Bible search (with UB paragraphs attached to each result)
+const { data: hits } = await api.bible.semanticSearch({
+  q: 'love your enemies',
+  limit: 5,
+  urantiaParallelLimit: 3,
+})
+hits[0].urantiaParallels // 3 UB paragraphs for the top Bible match
+
+// Combine all three on a single round-trip
+const { data: enriched } = await api.paragraphs.get('1:0.1', {
+  include: 'entities,bibleParallels,urantiaParallels',
+})
 ```
 
 ## Authenticated Endpoints
@@ -78,14 +104,21 @@ await api.me.preferences.update({ theme: 'dark', fontSize: 16 })
 | `api.paragraphs.get(ref)` | GET | Paragraph by reference |
 | `api.paragraphs.random()` | GET | Random paragraph |
 | `api.paragraphs.context(ref)` | GET | Paragraph with surrounding context |
-| `api.search.fullText(params)` | POST | Full-text search |
-| `api.search.semantic(params)` | POST | Semantic vector search |
+| `api.search.fullText(params)` | POST | Full-text search across UB paragraphs |
+| `api.search.semantic(params)` | POST | Semantic vector search across UB paragraphs |
 | `api.entities.list(options)` | GET | List entities |
 | `api.entities.get(id)` | GET | Entity details |
 | `api.entities.paragraphs(id)` | GET | Paragraphs mentioning entity |
+| `api.bible.books()` | GET | List all 81 Bible books |
+| `api.bible.book(code)` | GET | Bible book metadata |
+| `api.bible.chapter(code, ch)` | GET | All verses in a chapter |
+| `api.bible.verse(code, ch, v)` | GET | Single verse |
+| `api.bible.urantiaParallels(code, ch, v)` | GET | Top-10 UB paragraphs for a Bible verse |
+| `api.bible.semanticSearch(params)` | POST | Bible semantic search (each result includes top-N UB paragraphs) |
 | `api.audio.get(ref)` | GET | Audio URLs for paragraph |
 | `api.cite.get(ref, style)` | GET | Generate citation |
-| `api.embeddings.get(refs)` | POST | Get vector embeddings |
+| `api.embeddings.get(ref, opts?)` | GET | Embedding vector (`{ model: 'small' \| 'large' }`, default `large`) |
+| `api.embeddings.exportPaper(id, opts?)` | GET | Bulk export embeddings for a paper |
 | `api.me.get()` | GET | User profile (auth) |
 | `api.me.update(data)` | PUT | Update profile (auth) |
 | `api.me.bookmarks.*` | — | Bookmark CRUD (auth) |

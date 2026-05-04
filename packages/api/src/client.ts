@@ -5,6 +5,7 @@ import { SearchEndpoint } from "./endpoints/search.js";
 import { EntitiesEndpoint } from "./endpoints/entities.js";
 import { TocEndpoint } from "./endpoints/toc.js";
 import { AudioEndpoint } from "./endpoints/audio.js";
+import { BibleEndpoint } from "./endpoints/bible.js";
 import { CiteEndpoint } from "./endpoints/cite.js";
 import { EmbeddingsEndpoint } from "./endpoints/embeddings.js";
 import { MeEndpoint } from "./endpoints/me.js";
@@ -28,9 +29,11 @@ export class UrantiaAPI {
   readonly entities: EntitiesEndpoint;
   /** Audio URLs for paragraphs. */
   readonly audio: AudioEndpoint;
+  /** World English Bible (38,034 verses across 81 books) and UB↔Bible cross-references. */
+  readonly bible: BibleEndpoint;
   /** Citation generation (APA, MLA, Chicago, BibTeX). */
   readonly cite: CiteEndpoint;
-  /** Vector embeddings for paragraphs. */
+  /** Vector embeddings for paragraphs (text-embedding-3-small or text-embedding-3-large). */
   readonly embeddings: EmbeddingsEndpoint;
   /** Available languages and translation progress. */
   readonly languages: LanguagesEndpoint;
@@ -53,6 +56,7 @@ export class UrantiaAPI {
     this.search = new SearchEndpoint(this.baseUrl, headers);
     this.entities = new EntitiesEndpoint(this.baseUrl, headers);
     this.audio = new AudioEndpoint(this.baseUrl, headers);
+    this.bible = new BibleEndpoint(this.baseUrl, headers);
     this.cite = new CiteEndpoint(this.baseUrl, headers);
     this.embeddings = new EmbeddingsEndpoint(this.baseUrl, headers);
     this.languages = new LanguagesEndpoint(this.baseUrl, headers);
