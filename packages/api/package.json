@@ -30,13 +30,13 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/urantiahub/urantia-dev-sdks",
+    "url": "git+https://github.com/urantia-hub/urantia-dev-sdks.git",
     "directory": "packages/api"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "devDependencies": {
     "typescript": "^5.7.0"
-  },
-  "dependencies": {
-    "@urantia/api": "^0.2.1"
   }
 }
