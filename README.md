@@ -59,7 +59,7 @@ const { data: progress } = await api.me.readingProgress.get()
 
 ## API Documentation
 
-Full API docs: [urantia.dev](https://urantia.dev)
+Full API docs: [docs.urantia.dev](https://docs.urantia.dev). Project home: [urantia.dev](https://urantia.dev).
 
 ## Development
 
