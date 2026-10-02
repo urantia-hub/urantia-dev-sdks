@@ -290,6 +290,35 @@ export interface CitationResponse {
   };
 }
 
+// ─── Feedback ───
+
+export type FeedbackCategory = "bug" | "docs" | "api" | "product" | "other";
+
+export interface FeedbackParams {
+  category: FeedbackCategory;
+  /** What happened, or what you want. Up to 4000 characters. */
+  message: string;
+  /** A paragraph or paper reference, such as "196:2.1". */
+  ref?: string;
+  /** The API path that failed, such as "/search". */
+  endpoint?: string;
+  /** A correlation ID, or the CF-Ray header from the failed response. */
+  requestId?: string;
+  /** What sent the request, such as "my-app" or "claude-code". */
+  client?: string;
+  /** An email or a handle, if you want a reply. */
+  contact?: string;
+  /** The page the user was on. An http or https URL. */
+  pageUrl?: string;
+}
+
+export interface FeedbackResponse {
+  data: {
+    id: string;
+    receivedAt: string;
+  };
+}
+
 // ─── Embeddings ───
 
 export type EmbeddingModel = "small" | "large";

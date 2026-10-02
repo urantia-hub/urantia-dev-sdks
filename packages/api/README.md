@@ -119,6 +119,7 @@ await api.me.preferences.update({ theme: 'dark', fontSize: 16 })
 | `api.cite.get(ref, style)` | GET | Generate citation |
 | `api.embeddings.get(ref, opts?)` | GET | Embedding vector (`{ model: 'small' \| 'large' }`, default `large`) |
 | `api.embeddings.exportPaper(id, opts?)` | GET | Bulk export embeddings for a paper |
+| `api.feedback.submit(params)` | POST | Report a bug, a docs gap, or an idea (no auth) |
 | `api.me.get()` | GET | User profile (auth) |
 | `api.me.update(data)` | PUT | Update profile (auth) |
 | `api.me.bookmarks.*` | — | Bookmark CRUD (auth) |
