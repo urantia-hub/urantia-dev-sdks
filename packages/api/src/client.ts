@@ -8,6 +8,7 @@ import { AudioEndpoint } from "./endpoints/audio.js";
 import { BibleEndpoint } from "./endpoints/bible.js";
 import { CiteEndpoint } from "./endpoints/cite.js";
 import { EmbeddingsEndpoint } from "./endpoints/embeddings.js";
+import { FeedbackEndpoint } from "./endpoints/feedback.js";
 import { MeEndpoint } from "./endpoints/me.js";
 import { LanguagesEndpoint } from "./endpoints/languages.js";
 
@@ -35,6 +36,8 @@ export class UrantiaAPI {
   readonly cite: CiteEndpoint;
   /** Vector embeddings for paragraphs (text-embedding-3-small or text-embedding-3-large). */
   readonly embeddings: EmbeddingsEndpoint;
+  /** Feedback — report a bug, a docs gap, or an idea. No token needed. */
+  readonly feedback: FeedbackEndpoint;
   /** Available languages and translation progress. */
   readonly languages: LanguagesEndpoint;
   /** Authenticated user endpoints (profile, bookmarks, notes, reading progress, preferences). Requires a token. */
@@ -59,6 +62,7 @@ export class UrantiaAPI {
     this.bible = new BibleEndpoint(this.baseUrl, headers);
     this.cite = new CiteEndpoint(this.baseUrl, headers);
     this.embeddings = new EmbeddingsEndpoint(this.baseUrl, headers);
+    this.feedback = new FeedbackEndpoint(this.baseUrl, headers);
     this.languages = new LanguagesEndpoint(this.baseUrl, headers);
     this.me = new MeEndpoint(this.baseUrl, headers);
   }

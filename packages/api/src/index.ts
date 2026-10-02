@@ -51,6 +51,10 @@ export type {
   EmbeddingModel,
   EmbeddingResponse,
   EmbeddingsExportResponse,
+  // Feedback
+  FeedbackCategory,
+  FeedbackParams,
+  FeedbackResponse,
   // Bible
   BibleCanon,
   BibleBook,
