@@ -13,5 +13,6 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm audit signatures
       - run: npm run build --workspaces
       - run: npm test --workspace @urantia/auth
