@@ -282,3 +282,17 @@ describe("a sign-out in another tab, before this tab hears of it", () => {
     expect(storage.has("urantia_auth_session")).toBe(true);
   });
 });
+
+describe("the address of the sign-in page", () => {
+  it("carries the permissions under the same name as the server entry", async () => {
+    const auth = make();
+    void auth.signIn({ scopes: ["profile", "bookmarks"], mode: "redirect" });
+    await flush();
+    await flush();
+    const url = new URL(location.href);
+    expect(url.searchParams.get("scope")).toBe("profile,bookmarks");
+    expect(url.searchParams.has("scopes")).toBe(false);
+    expect(url.searchParams.get("state")).toBeTruthy();
+    expect(url.searchParams.get("code_challenge")).toBeTruthy();
+  });
+});

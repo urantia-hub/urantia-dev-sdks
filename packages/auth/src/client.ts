@@ -78,7 +78,8 @@ export class UrantiaAuth {
 
     const params = new URLSearchParams({ app_id: this.appId, redirect_uri: this.redirectUri, state, code_challenge: codeChallenge });
     const scopes = options?.scopes ?? [];
-    if (scopes.length > 0) params.set("scopes", scopes.join(","));
+    // The same name as the server entry sends. The sign-in page reads one name for both.
+    if (scopes.length > 0) params.set("scope", scopes.join(","));
     const loginPageUrl = `${this.loginUrl}/login?${params}`;
 
     if ((options?.mode ?? "popup") === "redirect") {
