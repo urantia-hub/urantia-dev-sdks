@@ -230,7 +230,7 @@ describe("createTokenVerifier", () => {
 
 describe("the server entry", () => {
   it("has no reference to the browser", () => {
-    for (const file of ["src/server.ts", "src/pkce.ts"]) {
+    for (const file of ["src/server.ts", "src/flow.ts", "src/pkce.ts"]) {
       const text = readFileSync(file, "utf8");
       for (const word of ["window", "document", "localStorage", "sessionStorage"]) expect(text).not.toContain(word);
     }
