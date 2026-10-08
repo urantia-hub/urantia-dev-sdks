@@ -191,3 +191,61 @@ describe("signOut, completely", () => {
     expect(seen).toEqual(["a1", null, "a9"]);
   });
 });
+
+// Second round of the commit scan, 2026-10-08.
+describe("a sign-out in another tab", () => {
+  it("holds against a refresh that is under way in this tab", async () => {
+    storage.set("urantia_auth_session", stored(30));
+    let answer: (r: Response) => void = () => {};
+    fetchMock.mockImplementation((url: string) =>
+      url.endsWith("/auth/refresh") ? new Promise<Response>((r) => (answer = r)) : Promise.resolve(json(200, { data: { signOutToken: null } })),
+    );
+    const auth = make();
+    const refresh = auth.refreshSession().catch(() => "stopped");
+    // The other tab signs out: the key goes, and this tab hears it.
+    storage.delete("urantia_auth_session");
+    listeners.get("storage")?.({ key: "urantia_auth_session", newValue: null });
+    answer(json(200, tokens(15, "r-new")));
+    await refresh;
+    await flush();
+    expect(auth.getSession()).toBeNull();
+    expect(storage.has("urantia_auth_session")).toBe(false);
+  });
+});
+
+describe("a sign-out while a sign-in is finishing", () => {
+  it("stays signed out when the code exchange answers after it", async () => {
+    storage.set("urantia_auth_pkce", JSON.stringify({ codeVerifier: "v1", state: "s1" }));
+    let answer: (r: Response) => void = () => {};
+    fetchMock.mockImplementation((url: string) =>
+      url.endsWith("/auth/token") ? new Promise<Response>((r) => (answer = r)) : Promise.resolve(json(200, { data: { signOutToken: null } })),
+    );
+    const auth = make();
+    const signIn = auth.handleCallback("https://app.example/callback?code=c1&state=s1").catch(() => "stopped");
+    await auth.signOut();
+    answer(json(200, tokens(15, "r-late")));
+    expect(await signIn).toBe("stopped");
+    await flush();
+    expect(auth.getSession()).toBeNull();
+    expect(storage.has("urantia_auth_session")).toBe(false);
+    const revoked = fetchMock.mock.calls.filter(([u]) => (u as string).endsWith("/auth/revoke")).map(([, init]) => JSON.parse((init as RequestInit).body as string).refreshToken);
+    expect(revoked).toContain("r-late");
+  });
+});
+
+describe("what is read from storage", () => {
+  // Another script on the page, or an old version, can leave anything under the key.
+  it.each([
+    ["text that is not JSON", "not json"],
+    ["a list", "[]"],
+    ["a session with no access token", JSON.stringify({ refreshToken: "r", expiresAt: new Date().toISOString(), user: { id: "u" } })],
+    ["a session with a date that is not a date", JSON.stringify({ accessToken: "a", refreshToken: "r", expiresAt: "soon", user: { id: "u", email: null, scopes: [] } })],
+    ["a session with no reader", JSON.stringify({ accessToken: "a", refreshToken: "r", expiresAt: new Date().toISOString() })],
+  ])("is dropped when it is %s", (_name, value) => {
+    storage.set("urantia_auth_session", value);
+    const auth = make();
+    expect(auth.getSession()).toBeNull();
+    expect(storage.has("urantia_auth_session")).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

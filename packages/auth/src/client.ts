@@ -44,6 +44,9 @@ export class UrantiaAuth {
       // Another tab of this app signed in, refreshed, or signed out.
       window.addEventListener?.("storage", (event: StorageEvent) => {
         if (event.key !== STORAGE_KEY) return;
+        // A removed key is a sign-out in the other tab. It counts as one here too, so a request that
+        // is under way in this tab cannot sign the reader in again.
+        if (!event.newValue) this.signOuts += 1;
         this.session = null;
         if (event.newValue) this.restoreSession();
         this.notify();
@@ -182,14 +185,7 @@ export class UrantiaAuth {
 
     const startedAt = this.signOuts;
     this.refreshing = refreshTokens({ appId: this.appId, refreshToken: current.refreshToken, apiUrl: this.apiUrl })
-      .then((tokens) => {
-        if (this.signOuts !== startedAt) {
-          // The reader signed out while this request was under way. End the new pair too.
-          void revokeTokens({ appId: this.appId, refreshToken: tokens.refreshToken, apiUrl: this.apiUrl });
-          throw new Error("Signed out.");
-        }
-        return this.keep(toSession(tokens));
-      })
+      .then((tokens) => this.keepUnlessSignedOut(tokens, startedAt))
       .catch((error) => {
         if (error instanceof AuthError && error.kind === "refused") this.clear();
         throw error;
@@ -209,7 +205,18 @@ export class UrantiaAuth {
     };
   }
 
+  // Each request that ends in a session passes here. If the reader signed out while the request was
+  // under way, the new pair is ended on the service and no session is kept.
+  private keepUnlessSignedOut(tokens: Tokens, startedAt: number): Session {
+    if (this.signOuts !== startedAt) {
+      void revokeTokens({ appId: this.appId, refreshToken: tokens.refreshToken, apiUrl: this.apiUrl });
+      throw new Error("Signed out.");
+    }
+    return this.keep(toSession(tokens));
+  }
+
   private async finish(code: string, codeVerifier?: string): Promise<Session> {
+    const startedAt = this.signOuts;
     const tokens = await exchangeCode({
       appId: this.appId,
       code,
@@ -218,7 +225,7 @@ export class UrantiaAuth {
       appSecret: this.appSecret,
       apiUrl: this.apiUrl,
     });
-    return this.keep(toSession(tokens));
+    return this.keepUnlessSignedOut(tokens, startedAt);
   }
 
   private keep(session: Session): Session {
@@ -243,15 +250,21 @@ export class UrantiaAuth {
   }
 
   private restoreSession(): void {
+    let session: Session | null = null;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const session = JSON.parse(raw) as Session;
-      // A session whose access token ended is kept while it has a refresh token: the first use refreshes it.
-      if (session.refreshToken || new Date(session.expiresAt) > new Date()) this.session = session;
-      else localStorage.removeItem(STORAGE_KEY);
+      session = asSession(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null"));
     } catch {
       // Not readable, or not available.
+    }
+    // A session whose access token ended is kept: the first use refreshes it.
+    if (session) {
+      this.session = session;
+      return;
+    }
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Storage is not available.
     }
   }
 
@@ -264,4 +277,25 @@ export class UrantiaAuth {
       }
     }
   }
+}
+
+// What is under the storage key, as a session, or null if it is not one. Another script on the page, or
+// an older version, can leave anything there.
+function asSession(value: unknown): Session | null {
+  if (typeof value !== "object" || value === null) return null;
+  const s = value as Partial<Session>;
+  if (typeof s.accessToken !== "string" || !s.accessToken) return null;
+  if (typeof s.refreshToken !== "string" || !s.refreshToken) return null;
+  if (typeof s.expiresAt !== "string" || Number.isNaN(new Date(s.expiresAt).getTime())) return null;
+  if (typeof s.user !== "object" || s.user === null || typeof s.user.id !== "string") return null;
+  return {
+    user: {
+      id: s.user.id,
+      email: typeof s.user.email === "string" ? s.user.email : null,
+      scopes: Array.isArray(s.user.scopes) ? s.user.scopes.filter((x): x is string => typeof x === "string") : [],
+    },
+    accessToken: s.accessToken,
+    refreshToken: s.refreshToken,
+    expiresAt: s.expiresAt,
+  };
 }
