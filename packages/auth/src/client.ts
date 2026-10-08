@@ -1,14 +1,27 @@
-import type {
-  UrantiaAuthOptions,
-  Session,
-  SignInOptions,
-  AuthStateChangeCallback,
-} from "./types.js";
+import { AuthError, exchangeCode, refreshTokens, revokeTokens, signOutUrl, type Tokens } from "./flow.js";
+import { generatePKCE, randomToken } from "./pkce.js";
+import type { AuthStateChangeCallback, Session, SignInOptions, UrantiaAuthOptions } from "./types.js";
 
 const DEFAULT_LOGIN_URL = "https://accounts.urantiahub.com";
 const DEFAULT_API_URL = "https://api.urantia.dev";
 const STORAGE_KEY = "urantia_auth_session";
+const PKCE_KEY = "urantia_auth_pkce";
+// The count of sign-outs in this browser. Each tab reads it at once, with no wait for a storage event.
+const SIGN_OUTS_KEY = "urantia_auth_sign_outs";
+// Refresh this long before the access token ends.
+const REFRESH_AHEAD_MS = 2 * 60 * 1000;
 
+const toSession = (tokens: Tokens): Session => ({
+  user: { id: tokens.userId, email: tokens.email, scopes: tokens.scopes },
+  accessToken: tokens.accessToken,
+  refreshToken: tokens.refreshToken,
+  expiresAt: tokens.expiresAt,
+});
+
+/**
+ * Sign-in with a UrantiaHub account, in the browser. The tokens are kept in localStorage.
+ * For a server that keeps the session in a cookie, use `@urantia/auth/server`.
+ */
 export class UrantiaAuth {
   private readonly appId: string;
   private readonly appSecret?: string;
@@ -17,6 +30,10 @@ export class UrantiaAuth {
   private readonly redirectUri?: string;
   private session: Session | null = null;
   private listeners: Set<AuthStateChangeCallback> = new Set();
+  // One refresh at a time. A refresh token works one time, so two requests would end the sign-in.
+  private refreshing: Promise<Session> | null = null;
+  // Counts the sign-outs. A refresh that answers after a sign-out must not sign the reader in again.
+  private signOuts = 0;
 
   constructor(options: UrantiaAuthOptions) {
     this.appId = options.appId;
@@ -24,92 +41,59 @@ export class UrantiaAuth {
     this.loginUrl = (options.loginUrl ?? DEFAULT_LOGIN_URL).replace(/\/+$/, "");
     this.apiUrl = (options.apiUrl ?? DEFAULT_API_URL).replace(/\/+$/, "");
     this.redirectUri = options.redirectUri;
-
-    // Restore session from storage in browser
     if (typeof window !== "undefined") {
       this.restoreSession();
+      // Another tab of this app signed in, refreshed, or signed out.
+      window.addEventListener?.("storage", (event: StorageEvent) => {
+        if (event.key !== STORAGE_KEY) return;
+        // A removed key is a sign-out in the other tab. It counts as one here too, so a request that
+        // is under way in this tab cannot sign the reader in again.
+        if (!event.newValue) this.signOuts += 1;
+        this.session = null;
+        if (event.newValue) this.restoreSession();
+        this.notify();
+      });
     }
   }
 
   /**
-   * Start the OAuth sign-in flow.
+   * Start the sign-in.
    *
-   * **Browser (popup mode):** Opens a popup window to accounts.urantiahub.com/login.
-   * After the user signs in, the popup redirects back with an authorization code
-   * which is exchanged for an access token.
-   *
-   * **Browser (redirect mode):** Redirects the current page to the login URL.
-   * After sign-in, call `handleCallback()` on the redirect URI page.
-   *
-   * **Server:** Pass an authorization `code` obtained from the OAuth flow
-   * to exchange it for a token directly.
+   * Popup mode (the default) opens the sign-in page in a popup and resolves with the session.
+   * Redirect mode sends this page to the sign-in page: call `handleCallback()` on the return page.
+   * On a server, pass the `code` from the return address, or use `@urantia/auth/server`.
    */
   async signIn(options?: SignInOptions & { code?: string }): Promise<Session> {
-    // Server-side: direct code exchange
-    if (options?.code) {
-      return this.exchangeCode(options.code);
-    }
+    if (options?.code) return this.finish(options.code);
 
-    // Browser: must have a redirectUri
     if (typeof window === "undefined") {
-      throw new Error(
-        "UrantiaAuth.signIn() requires a `code` parameter in server environments. " +
-          "Use the browser flow or obtain an authorization code first."
-      );
+      throw new Error("UrantiaAuth.signIn() needs a `code` on a server. Use `@urantia/auth/server` for the whole flow.");
     }
-
-    if (!this.redirectUri) {
-      throw new Error(
-        "UrantiaAuth requires a `redirectUri` option for browser sign-in."
-      );
-    }
+    if (!this.redirectUri) throw new Error("UrantiaAuth needs a `redirectUri` option for a sign-in in the browser.");
 
     const { codeVerifier, codeChallenge } = await generatePKCE();
+    const state = randomToken(32);
+    // localStorage, so the data is there when an email link opens the return page in a new tab.
+    localStorage.setItem(PKCE_KEY, JSON.stringify({ codeVerifier, state }));
+
+    const params = new URLSearchParams({ app_id: this.appId, redirect_uri: this.redirectUri, state, code_challenge: codeChallenge });
     const scopes = options?.scopes ?? [];
-    const state = crypto.randomUUID();
-    const mode = options?.mode ?? "popup";
+    if (scopes.length > 0) params.set("scopes", scopes.join(","));
+    const loginPageUrl = `${this.loginUrl}/login?${params}`;
 
-    // Store PKCE verifier and state for callback
-    // Use localStorage (not sessionStorage) so the data survives magic-link
-    // emails that open in a new browser tab.
-    localStorage.setItem(
-      "urantia_auth_pkce",
-      JSON.stringify({ codeVerifier, state })
-    );
-
-    const loginParams = new URLSearchParams({
-      app_id: this.appId,
-      redirect_uri: this.redirectUri,
-      state,
-      code_challenge: codeChallenge,
-    });
-    if (scopes.length > 0) {
-      loginParams.set("scopes", scopes.join(","));
-    }
-
-    const loginPageUrl = `${this.loginUrl}/login?${loginParams}`;
-
-    if (mode === "redirect") {
+    if ((options?.mode ?? "popup") === "redirect") {
       window.location.href = loginPageUrl;
-      // This will navigate away — return a never-resolving promise
       return new Promise(() => {});
     }
 
-    // Popup mode
     return new Promise((resolve, reject) => {
       const width = 500;
       const height = 700;
       const left = window.screenX + (window.outerWidth - width) / 2;
       const top = window.screenY + (window.outerHeight - height) / 2;
-
-      const popup = window.open(
-        loginPageUrl,
-        "urantia_auth",
-        `width=${width},height=${height},left=${left},top=${top},popup=1`
-      );
-
+      const popup = window.open(loginPageUrl, "urantia_auth", `width=${width},height=${height},left=${left},top=${top},popup=1`);
       if (!popup) {
-        reject(new Error("Failed to open popup window. Please allow popups."));
+        reject(new Error("The popup did not open. Allow popups for this site."));
         return;
       }
 
@@ -117,263 +101,223 @@ export class UrantiaAuth {
         try {
           if (popup.closed) {
             clearInterval(interval);
-            reject(new Error("Sign-in popup was closed."));
+            reject(new Error("The sign-in popup was closed."));
             return;
           }
           const url = new URL(popup.location.href);
           if (url.origin === window.location.origin) {
             clearInterval(interval);
             popup.close();
-            const code = url.searchParams.get("code");
-            if (!code) {
-              const error = url.searchParams.get("error") || "No code received";
-              reject(new Error(error));
-              return;
-            }
-            this.exchangeCode(code, codeVerifier).then(resolve, reject);
+            this.handleCallback(url.toString()).then(resolve, reject);
           }
         } catch {
-          // Cross-origin — popup hasn't redirected back yet
+          // Another origin: the popup is still on the sign-in page.
         }
       }, 200);
     });
   }
 
-  /**
-   * Handle the OAuth callback on the redirect URI page.
-   * Call this in your redirect page to complete the sign-in flow.
-   */
+  /** Finish a sign-in on the return page. It checks the `state` that `signIn()` sent. */
   async handleCallback(url?: string): Promise<Session> {
     const callbackUrl = new URL(url ?? window.location.href);
-    const code = callbackUrl.searchParams.get("code");
-    const returnedState = callbackUrl.searchParams.get("state");
     const error = callbackUrl.searchParams.get("error");
+    if (error) throw new Error(error);
+    const code = callbackUrl.searchParams.get("code");
+    if (!code) throw new Error("The return address has no code.");
 
-    if (error) {
-      throw new Error(error);
-    }
-    if (!code) {
-      throw new Error("No authorization code in callback URL.");
-    }
+    const stored = localStorage.getItem(PKCE_KEY);
+    if (!stored) throw new Error("No sign-in was started in this browser. Call signIn() first.");
+    const { codeVerifier, state } = JSON.parse(stored) as { codeVerifier: string; state: string };
+    localStorage.removeItem(PKCE_KEY);
 
-    // Verify state and retrieve PKCE verifier
-    const stored = localStorage.getItem("urantia_auth_pkce");
-    if (!stored) {
-      throw new Error("No PKCE data found. Was signIn() called first?");
+    // The state must come back, and it must be the one that was sent. A return with none is refused.
+    if (!state || callbackUrl.searchParams.get("state") !== state) {
+      throw new Error("The state of the return does not match the sign-in that was started.");
     }
-    const { codeVerifier, state } = JSON.parse(stored);
-    localStorage.removeItem("urantia_auth_pkce");
-
-    if (returnedState && returnedState !== state) {
-      throw new Error("State mismatch — possible CSRF attack.");
-    }
-
-    return this.exchangeCode(code, codeVerifier);
-  }
-
-  /** Sign out and clear the session. */
-  signOut(): void {
-    this.session = null;
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.removeItem(STORAGE_KEY);
-      } catch {
-        // Storage may be unavailable
-      }
-    }
-    this.notifyListeners();
+    return this.finish(code, codeVerifier);
   }
 
   /**
-   * Get the current session, or null if not signed in.
-   * If the access token is expired or near expiry (within 5 minutes),
-   * automatically attempts to refresh using the refresh token.
+   * Sign out. The sign-in in this browser ends at once, and the service is told in the background.
+   *
+   * With `returnTo` (an address that your app registered), the page then goes to the accounts site,
+   * which ends the UrantiaHub account session too and sends the reader back. Use it for a sign-out
+   * on a shared computer.
+   */
+  async signOut(options?: { returnTo?: string }): Promise<void> {
+    const refreshToken = this.session?.refreshToken;
+    this.markSignOut();
+    this.clear();
+    try {
+      localStorage.removeItem(PKCE_KEY);
+    } catch {
+      // Storage is not available.
+    }
+    if (!refreshToken) return;
+    const { signOutToken } = await revokeTokens({ appId: this.appId, refreshToken, apiUrl: this.apiUrl });
+    if (options?.returnTo && typeof window !== "undefined") {
+      window.location.href = signOutUrl({ appId: this.appId, returnTo: options.returnTo, signOutToken, loginUrl: this.loginUrl });
+    }
+  }
+
+  /**
+   * The session, or null. A session whose access token is near its end is refreshed in the
+   * background: `onAuthStateChange` fires when the new one is there.
    */
   getSession(): Session | null {
     if (!this.session) return null;
-
-    const expiresAt = new Date(this.session.expiresAt);
-    const fiveMinFromNow = new Date(Date.now() + 5 * 60 * 1000);
-
-    if (expiresAt < fiveMinFromNow) {
-      // Token expired or expiring soon — trigger background refresh
-      // Return null for now; the refresh will notify listeners when done
-      if (this.session.refreshToken) {
-        this.refreshSession().catch(() => {
-          this.signOut();
-        });
-      } else {
-        this.signOut();
-      }
-      // If expired, return null. If just near-expiry, return current session.
-      if (expiresAt < new Date()) return null;
-    }
-    return this.session;
+    const endsIn = new Date(this.session.expiresAt).getTime() - Date.now();
+    if (endsIn < REFRESH_AHEAD_MS) this.refreshSession().catch(() => {});
+    return endsIn > 0 ? this.session : null;
   }
 
-  /** Get the current access token, or null if not signed in. */
+  /** The access token, or null. */
   getToken(): string | null {
     return this.getSession()?.accessToken ?? null;
   }
 
   /**
-   * Refresh the session using the stored refresh token.
-   * Returns the new session, or throws if refresh fails.
+   * Get a new access token now. If the service refuses the refresh token, the sign-in ends.
+   * If the service is down or the request fails, the sign-in is kept, and this throws.
    */
-  async refreshSession(): Promise<Session> {
-    if (!this.session?.refreshToken) {
-      throw new Error("No refresh token available.");
-    }
+  refreshSession(): Promise<Session> {
+    if (this.refreshing) return this.refreshing;
+    const current = this.session;
+    if (!current?.refreshToken) return Promise.reject(new Error("No refresh token."));
 
-    const res = await fetch(`${this.apiUrl}/auth/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        refreshToken: this.session.refreshToken,
-        appId: this.appId,
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => null);
-      // If refresh fails (e.g. token revoked), sign out
-      this.signOut();
-      throw new Error(
-        err?.detail || err?.title || `Token refresh failed: ${res.status}`
-      );
-    }
-
-    const { data } = await res.json();
-    const session: Session = {
-      user: {
-        id: data.userId,
-        email: data.email ?? null,
-        scopes: data.scopes ?? [],
-      },
-      accessToken: data.accessToken,
-      refreshToken: data.refreshToken,
-      expiresAt: data.expiresAt,
-    };
-
-    this.session = session;
-    this.persistSession();
-    this.notifyListeners();
-    return session;
+    const startedAt = this.signOutCount();
+    this.refreshing = refreshTokens({ appId: this.appId, refreshToken: current.refreshToken, apiUrl: this.apiUrl })
+      .then((tokens) => this.keepUnlessSignedOut(tokens, startedAt))
+      .catch((error) => {
+        if (error instanceof AuthError && error.kind === "refused") this.clear();
+        throw error;
+      })
+      .finally(() => {
+        this.refreshing = null;
+      });
+    return this.refreshing;
   }
 
-  /** Listen for auth state changes (sign-in / sign-out). Returns an unsubscribe function. */
+  /** Listen for a sign-in, a refresh, and a sign-out. Returns a function that stops it. */
   onAuthStateChange(callback: AuthStateChangeCallback): () => void {
     this.listeners.add(callback);
-    // Fire immediately with current state
     callback(this.session);
     return () => {
       this.listeners.delete(callback);
     };
   }
 
-  // ─── Private ───
-
-  private async exchangeCode(
-    code: string,
-    codeVerifier?: string
-  ): Promise<Session> {
-    const body: Record<string, string> = {
-      code,
-      appId: this.appId,
-    };
-    if (this.appSecret) body.appSecret = this.appSecret;
-    if (codeVerifier) body.codeVerifier = codeVerifier;
-
-    const res = await fetch(`${this.apiUrl}/auth/token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => null);
-      throw new Error(
-        err?.detail || err?.title || `Token exchange failed: ${res.status}`
-      );
+  // Each request that ends in a session passes here. If the reader signed out while the request was
+  // under way, the new pair is ended on the service and no session is kept.
+  private keepUnlessSignedOut(tokens: Tokens, startedAt: string): Session {
+    if (this.signOutCount() !== startedAt) {
+      void revokeTokens({ appId: this.appId, refreshToken: tokens.refreshToken, apiUrl: this.apiUrl });
+      throw new Error("Signed out.");
     }
+    return this.keep(toSession(tokens));
+  }
 
-    const { data } = await res.json();
-    const session: Session = {
-      user: {
-        id: data.userId,
-        email: data.email ?? null,
-        scopes: data.scopes ?? [],
-      },
-      accessToken: data.accessToken,
-      refreshToken: data.refreshToken,
-      expiresAt: data.expiresAt,
-    };
+  private async finish(code: string, codeVerifier?: string): Promise<Session> {
+    const startedAt = this.signOutCount();
+    const tokens = await exchangeCode({
+      appId: this.appId,
+      code,
+      codeVerifier,
+      redirectUri: this.redirectUri,
+      appSecret: this.appSecret,
+      apiUrl: this.apiUrl,
+    });
+    return this.keepUnlessSignedOut(tokens, startedAt);
+  }
 
+  // The sign-outs that this client knows of: its own, and those of each other tab of this browser.
+  private signOutCount(): string {
+    let shared = "";
+    try {
+      shared = localStorage.getItem(SIGN_OUTS_KEY) ?? "";
+    } catch {
+      // Storage is not available.
+    }
+    return `${this.signOuts}:${shared}`;
+  }
+
+  private markSignOut(): void {
+    this.signOuts += 1;
+    try {
+      localStorage.setItem(SIGN_OUTS_KEY, String(Number(localStorage.getItem(SIGN_OUTS_KEY) ?? "0") + 1));
+    } catch {
+      // Storage is not available. The count in memory still holds for this tab.
+    }
+  }
+
+  private keep(session: Session): Session {
     this.session = session;
-    this.persistSession();
-    this.notifyListeners();
+    try {
+      if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    } catch {
+      // Storage is not available.
+    }
+    this.notify();
     return session;
   }
 
-  private persistSession(): void {
-    if (typeof window === "undefined") return;
+  private clear(): void {
+    this.session = null;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.session));
+      if (typeof window !== "undefined") localStorage.removeItem(STORAGE_KEY);
     } catch {
-      // Storage may be unavailable
+      // Storage is not available.
     }
+    this.notify();
   }
 
   private restoreSession(): void {
+    let session: Session | null = null;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const session: Session = JSON.parse(raw);
-      if (new Date(session.expiresAt) > new Date()) {
-        this.session = session;
-      } else {
-        localStorage.removeItem(STORAGE_KEY);
-      }
+      session = asSession(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null"));
     } catch {
-      // Corrupt or unavailable
+      // Not readable, or not available.
+    }
+    // A session whose access token ended is kept: the first use refreshes it.
+    if (session) {
+      this.session = session;
+      return;
+    }
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Storage is not available.
     }
   }
 
-  private notifyListeners(): void {
-    for (const cb of this.listeners) {
+  private notify(): void {
+    for (const callback of this.listeners) {
       try {
-        cb(this.session);
+        callback(this.session);
       } catch {
-        // Don't let listener errors break the auth flow
+        // A listener that throws must not break the sign-in.
       }
     }
   }
 }
 
-// ─── PKCE Helpers ───
-
-async function generatePKCE(): Promise<{
-  codeVerifier: string;
-  codeChallenge: string;
-}> {
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  const codeVerifier = base64UrlEncode(array);
-
-  const encoder = new TextEncoder();
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    encoder.encode(codeVerifier)
-  );
-  const codeChallenge = base64UrlEncode(new Uint8Array(digest));
-
-  return { codeVerifier, codeChallenge };
-}
-
-function base64UrlEncode(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+// What is under the storage key, as a session, or null if it is not one. Another script on the page, or
+// an older version, can leave anything there.
+function asSession(value: unknown): Session | null {
+  if (typeof value !== "object" || value === null) return null;
+  const s = value as Partial<Session>;
+  if (typeof s.accessToken !== "string" || !s.accessToken) return null;
+  if (typeof s.refreshToken !== "string" || !s.refreshToken) return null;
+  if (typeof s.expiresAt !== "string" || Number.isNaN(new Date(s.expiresAt).getTime())) return null;
+  if (typeof s.user !== "object" || s.user === null || typeof s.user.id !== "string") return null;
+  return {
+    user: {
+      id: s.user.id,
+      email: typeof s.user.email === "string" ? s.user.email : null,
+      scopes: Array.isArray(s.user.scopes) ? s.user.scopes.filter((x): x is string => typeof x === "string") : [],
+    },
+    accessToken: s.accessToken,
+    refreshToken: s.refreshToken,
+    expiresAt: s.expiresAt,
+  };
 }
