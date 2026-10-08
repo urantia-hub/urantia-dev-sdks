@@ -107,14 +107,19 @@ describe("exchangeCode, refreshTokens, revokeTokens", () => {
 
   it("revokes, and gives the sign-out token", async () => {
     const fetch = vi.fn(async () => json(200, { data: { signOutToken: "so1" } }));
-    expect(await revokeTokens({ appId: "my-app", refreshToken: "r1", fetch })).toEqual({ signOutToken: "so1" });
+    expect(await revokeTokens({ appId: "my-app", refreshToken: "r1", fetch })).toEqual({ revoked: true, signOutToken: "so1" });
     expect((fetch.mock.calls[0] as unknown as [string])[0]).toBe("https://api.urantia.dev/auth/revoke");
   });
 
   // A sign-out must go on when the API is down: the app still clears its own session.
-  it("gives no sign-out token, and does not throw, when the revoke request fails", async () => {
+  // It must also say that the sign-in is still alive on the service, so the app does not believe it ended.
+  it("does not throw when the revoke request fails, and says that nothing was revoked", async () => {
     const down = vi.fn(async () => { throw new TypeError("fetch failed"); });
-    expect(await revokeTokens({ appId: "a", refreshToken: "r", fetch: down })).toEqual({ signOutToken: null });
+    expect(await revokeTokens({ appId: "a", refreshToken: "r", fetch: down })).toEqual({ revoked: false, signOutToken: null });
+    const busy = vi.fn(async () => json(503, { detail: "Try again." }));
+    expect(await revokeTokens({ appId: "a", refreshToken: "r", fetch: busy })).toEqual({ revoked: false, signOutToken: null });
+    const odd = vi.fn(async () => json(200, { nothing: true }));
+    expect(await revokeTokens({ appId: "a", refreshToken: "r", fetch: odd })).toEqual({ revoked: false, signOutToken: null });
   });
 });
 
@@ -147,7 +152,7 @@ describe("createTokenVerifier", () => {
   it("verifies a token against the key file and returns the claims", async () => {
     const key = await makeKey("k1");
     const fetch = vi.fn(async () => json(200, { keys: [key.jwk] }));
-    const verify = createTokenVerifier({ fetch });
+    const verify = createTokenVerifier({ appId: "my-app", fetch });
     expect(await verify(await sign(key.privateKey, "k1"))).toEqual({ userId: "reader-1", appId: "my-app", email: null, scopes: ["profile"] });
     expect((fetch.mock.calls[0] as unknown as [string])[0]).toBe("https://accounts.urantiahub.com/.well-known/jwks.json");
   });
@@ -155,7 +160,7 @@ describe("createTokenVerifier", () => {
   it("fetches the keys one time for many tokens", async () => {
     const key = await makeKey("k1");
     const fetch = vi.fn(async () => json(200, { keys: [key.jwk] }));
-    const verify = createTokenVerifier({ fetch });
+    const verify = createTokenVerifier({ appId: "my-app", fetch });
     await verify(await sign(key.privateKey, "k1"));
     await verify(await sign(key.privateKey, "k1"));
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -167,7 +172,7 @@ describe("createTokenVerifier", () => {
     const newKey = await makeKey("k2");
     let served = [oldKey.jwk];
     const fetch = vi.fn(async () => json(200, { keys: served }));
-    const verify = createTokenVerifier({ fetch });
+    const verify = createTokenVerifier({ appId: "my-app", fetch });
     await verify(await sign(oldKey.privateKey, "k1"));
     served = [oldKey.jwk, newKey.jwk];
     expect((await verify(await sign(newKey.privateKey, "k2"))).userId).toBe("reader-1");
@@ -177,13 +182,31 @@ describe("createTokenVerifier", () => {
   it("does not fetch the keys again for each token with a made-up key id", async () => {
     const key = await makeKey("k1");
     const fetch = vi.fn(async () => json(200, { keys: [key.jwk] }));
-    const verify = createTokenVerifier({ fetch });
+    const verify = createTokenVerifier({ appId: "my-app", fetch });
     for (let i = 0; i < 5; i++) await verify(await sign(key.privateKey, `made-up-${i}`)).catch(() => {});
     // The first load, and one more look.
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
-  it("refuses a token of another app when appId is given", async () => {
+  // The same key signs the tokens of each app. A backend that takes any of them takes the token that
+  // another app holds for the same reader.
+  it("needs the app to be named, or a plain statement that any app is accepted", async () => {
+    const key = await makeKey("k1");
+    const fetch = vi.fn(async () => json(200, { keys: [key.jwk] }));
+    // @ts-expect-error appId or anyApp is required
+    expect(() => createTokenVerifier({ fetch })).toThrow(/appId/);
+    const open = createTokenVerifier({ anyApp: true, fetch });
+    expect((await open(await sign(key.privateKey, "k1", { app_id: "another-app" }))).appId).toBe("another-app");
+  });
+
+  it("accepts a list of apps", async () => {
+    const key = await makeKey("k1");
+    const verify = createTokenVerifier({ appId: ["web", "mobile"], fetch: vi.fn(async () => json(200, { keys: [key.jwk] })) });
+    expect((await verify(await sign(key.privateKey, "k1", { app_id: "mobile" }))).appId).toBe("mobile");
+    expect(await verify(await sign(key.privateKey, "k1", { app_id: "my-app" })).catch((e) => e)).toMatchObject({ kind: "refused" });
+  });
+
+  it("refuses a token of another app", async () => {
     const key = await makeKey("k1");
     const verify = createTokenVerifier({ appId: "other-app", fetch: vi.fn(async () => json(200, { keys: [key.jwk] })) });
     expect(await verify(await sign(key.privateKey, "k1")).catch((e) => e)).toMatchObject({ kind: "refused" });
@@ -192,7 +215,7 @@ describe("createTokenVerifier", () => {
   it("refuses a sign-out token, a token of another key, and text that is not a token", async () => {
     const key = await makeKey("k1");
     const other = await makeKey("k1");
-    const verify = createTokenVerifier({ fetch: vi.fn(async () => json(200, { keys: [key.jwk] })) });
+    const verify = createTokenVerifier({ appId: "my-app", fetch: vi.fn(async () => json(200, { keys: [key.jwk] })) });
     expect(await verify(await sign(key.privateKey, "k1", { purpose: "signout" }, "signout")).catch((e) => e)).toMatchObject({ kind: "refused" });
     expect(await verify(await sign(other.privateKey, "k1")).catch((e) => e)).toMatchObject({ kind: "refused" });
     expect(await verify("abc").catch((e) => e)).toMatchObject({ kind: "refused" });
@@ -200,7 +223,7 @@ describe("createTokenVerifier", () => {
 
   it("names it unavailable, not refused, when the key file cannot be read", async () => {
     const key = await makeKey("k1");
-    const verify = createTokenVerifier({ fetch: vi.fn(async () => { throw new TypeError("fetch failed"); }) });
+    const verify = createTokenVerifier({ appId: "my-app", fetch: vi.fn(async () => { throw new TypeError("fetch failed"); }) });
     expect(await verify(await sign(key.privateKey, "k1")).catch((e) => e)).toMatchObject({ kind: "unavailable" });
   });
 });

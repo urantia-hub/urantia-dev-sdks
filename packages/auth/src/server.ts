@@ -119,15 +119,20 @@ export async function refreshTokens(input: { appId: string; refreshToken: string
 }
 
 /**
- * End this sign-in on the service. It never throws: a sign-out must go on when the service is down.
+ * End this sign-in on the service. It never throws: your own sign-out must go on when the service is down.
+ *
+ * `revoked: false` means that the service did not confirm it, so the refresh token can still be alive there.
+ * Clear your own session in each case, and keep the refresh token to try again later if that matters to you.
  * Pass the sign-out token to signOutUrl.
  */
-export async function revokeTokens(input: { appId: string; refreshToken: string } & Endpoints): Promise<{ signOutToken: string | null }> {
+export async function revokeTokens(input: { appId: string; refreshToken: string } & Endpoints): Promise<{ revoked: boolean; signOutToken: string | null }> {
   try {
     const data = (await post("/auth/revoke", { appId: input.appId, refreshToken: input.refreshToken }, input)) as { signOutToken?: unknown } | undefined;
-    return { signOutToken: typeof data?.signOutToken === "string" ? data.signOutToken : null };
+    // The service always answers with this field, null or text. Without it, this was not its answer.
+    if (!data || !("signOutToken" in data)) return { revoked: false, signOutToken: null };
+    return { revoked: true, signOutToken: typeof data.signOutToken === "string" ? data.signOutToken : null };
   } catch {
-    return { signOutToken: null };
+    return { revoked: false, signOutToken: null };
   }
 }
 
@@ -143,11 +148,22 @@ export function signOutUrl(input: { appId: string; returnTo: string; signOutToke
 
 const KEYS_FRESH_MS = 5 * 60 * 1000;
 
+type VerifierApps =
+  | { /** The app, or the apps, whose tokens this backend accepts. */ appId: string | string[]; anyApp?: never }
+  | { /** Accept a token of each app. Only for a service that is meant for all of them. */ anyApp: true; appId?: never };
+
 /**
  * Makes a function that checks an access token against the published keys, with no call to the API.
  * For a backend that receives tokens from an app. Make it one time and use it for each request.
+ *
+ * Name your app. One key signs the tokens of each app, so a backend that accepts any of them also
+ * accepts the token that another app holds for the same reader.
  */
-export function createTokenVerifier(options: { appId?: string; jwksUrl?: string; fetch?: Fetch } = {}): (token: string) => Promise<Claims> {
+export function createTokenVerifier(options: VerifierApps & { jwksUrl?: string; fetch?: Fetch }): (token: string) => Promise<Claims> {
+  const accepted = options.anyApp === true ? null : ([] as string[]).concat(options.appId ?? []).filter(Boolean);
+  if (accepted !== null && accepted.length === 0) {
+    throw new Error("createTokenVerifier needs `appId` (the app whose tokens you accept), or `anyApp: true`.");
+  }
   const jwksUrl = options.jwksUrl ?? `${DEFAULT_LOGIN_URL}/.well-known/jwks.json`;
   let keys: JSONWebKeySet | null = null;
   let fetchedAt = 0;
@@ -191,7 +207,7 @@ export function createTokenVerifier(options: { appId?: string; jwksUrl?: string;
     if (payload.purpose !== undefined || typeof payload.sub !== "string" || typeof payload.app_id !== "string") {
       throw new AuthError("refused", "The token is not an access token.");
     }
-    if (options.appId && payload.app_id !== options.appId) throw new AuthError("refused", "The token is for another app.");
+    if (accepted !== null && !accepted.includes(payload.app_id)) throw new AuthError("refused", "The token is for another app.");
     return {
       userId: payload.sub,
       appId: payload.app_id,
