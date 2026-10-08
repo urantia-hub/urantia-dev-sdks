@@ -30,6 +30,8 @@ export class UrantiaAuth {
   private listeners: Set<AuthStateChangeCallback> = new Set();
   // One refresh at a time. A refresh token works one time, so two requests would end the sign-in.
   private refreshing: Promise<Session> | null = null;
+  // Counts the sign-outs. A refresh that answers after a sign-out must not sign the reader in again.
+  private signOuts = 0;
 
   constructor(options: UrantiaAuthOptions) {
     this.appId = options.appId;
@@ -37,7 +39,16 @@ export class UrantiaAuth {
     this.loginUrl = (options.loginUrl ?? DEFAULT_LOGIN_URL).replace(/\/+$/, "");
     this.apiUrl = (options.apiUrl ?? DEFAULT_API_URL).replace(/\/+$/, "");
     this.redirectUri = options.redirectUri;
-    if (typeof window !== "undefined") this.restoreSession();
+    if (typeof window !== "undefined") {
+      this.restoreSession();
+      // Another tab of this app signed in, refreshed, or signed out.
+      window.addEventListener?.("storage", (event: StorageEvent) => {
+        if (event.key !== STORAGE_KEY) return;
+        this.session = null;
+        if (event.newValue) this.restoreSession();
+        this.notify();
+      });
+    }
   }
 
   /**
@@ -130,7 +141,13 @@ export class UrantiaAuth {
    */
   async signOut(options?: { returnTo?: string }): Promise<void> {
     const refreshToken = this.session?.refreshToken;
+    this.signOuts += 1;
     this.clear();
+    try {
+      localStorage.removeItem(PKCE_KEY);
+    } catch {
+      // Storage is not available.
+    }
     if (!refreshToken) return;
     const { signOutToken } = await revokeTokens({ appId: this.appId, refreshToken, apiUrl: this.apiUrl });
     if (options?.returnTo && typeof window !== "undefined") {
@@ -163,8 +180,16 @@ export class UrantiaAuth {
     const current = this.session;
     if (!current?.refreshToken) return Promise.reject(new Error("No refresh token."));
 
+    const startedAt = this.signOuts;
     this.refreshing = refreshTokens({ appId: this.appId, refreshToken: current.refreshToken, apiUrl: this.apiUrl })
-      .then((tokens) => this.keep(toSession(tokens)))
+      .then((tokens) => {
+        if (this.signOuts !== startedAt) {
+          // The reader signed out while this request was under way. End the new pair too.
+          void revokeTokens({ appId: this.appId, refreshToken: tokens.refreshToken, apiUrl: this.apiUrl });
+          throw new Error("Signed out.");
+        }
+        return this.keep(toSession(tokens));
+      })
       .catch((error) => {
         if (error instanceof AuthError && error.kind === "refused") this.clear();
         throw error;

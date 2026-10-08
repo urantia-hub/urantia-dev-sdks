@@ -5,6 +5,7 @@ import { UrantiaAuth } from "./client.js";
 const storage = new Map<string, string>();
 const location = { href: "https://app.example/", origin: "https://app.example" };
 const fetchMock = vi.fn();
+const listeners = new Map<string, (e: unknown) => void>();
 
 beforeEach(() => {
   storage.clear();
@@ -15,7 +16,11 @@ beforeEach(() => {
     setItem: (k: string, v: string) => void storage.set(k, v),
     removeItem: (k: string) => void storage.delete(k),
   });
-  vi.stubGlobal("window", { location });
+  listeners.clear();
+  vi.stubGlobal("window", {
+    location,
+    addEventListener: (type: string, fn: (e: unknown) => void) => listeners.set(type, fn),
+  });
   vi.stubGlobal("fetch", fetchMock);
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -136,5 +141,53 @@ describe("signOut", () => {
     const url = new URL(location.href);
     expect(url.origin + url.pathname).toBe("https://accounts.urantiahub.com/signout");
     expect(Object.fromEntries(url.searchParams)).toEqual({ app_id: "my-app", return_to: "https://app.example/", token: "so1" });
+  });
+});
+
+// Findings of the commit scan, 2026-10-08.
+describe("a sign-out while a refresh is under way", () => {
+  it("stays signed out when the refresh answers after it", async () => {
+    storage.set("urantia_auth_session", stored(30));
+    let answer: (r: Response) => void = () => {};
+    fetchMock.mockImplementation((url: string) =>
+      url.endsWith("/auth/refresh") ? new Promise<Response>((r) => (answer = r)) : Promise.resolve(json(200, { data: { signOutToken: null } })),
+    );
+    const auth = make();
+    const refresh = auth.refreshSession().catch(() => "stopped");
+    await auth.signOut();
+    answer(json(200, tokens(15, "r-new")));
+    await refresh;
+    await flush();
+    expect(auth.getSession()).toBeNull();
+    expect(storage.has("urantia_auth_session")).toBe(false);
+    // The pair that arrived late is ended on the service too.
+    const revoked = fetchMock.mock.calls.filter(([u]) => (u as string).endsWith("/auth/revoke")).map(([, init]) => JSON.parse((init as RequestInit).body as string).refreshToken);
+    expect(revoked).toContain("r-new");
+  });
+});
+
+describe("signOut, completely", () => {
+  it("removes what a sign-in that was started left in storage", async () => {
+    storage.set("urantia_auth_session", stored(30));
+    storage.set("urantia_auth_pkce", JSON.stringify({ codeVerifier: "v", state: "s" }));
+    fetchMock.mockResolvedValue(json(200, { data: { signOutToken: null } }));
+    await make().signOut();
+    expect(storage.has("urantia_auth_pkce")).toBe(false);
+  });
+
+  // The app has more than one tab open. A sign-out in one is a sign-out in each.
+  it("signs out a second tab of the app, and signs it in when the first tab does", () => {
+    storage.set("urantia_auth_session", stored(30));
+    const other = make();
+    const seen: Array<string | null> = [];
+    other.onAuthStateChange((s) => seen.push(s?.accessToken ?? null));
+    storage.delete("urantia_auth_session");
+    listeners.get("storage")?.({ key: "urantia_auth_session", newValue: null });
+    expect(other.getSession()).toBeNull();
+    const fresh = JSON.stringify({ ...JSON.parse(stored(30)), accessToken: "a9" });
+    storage.set("urantia_auth_session", fresh);
+    listeners.get("storage")?.({ key: "urantia_auth_session", newValue: fresh });
+    expect(other.getSession()?.accessToken).toBe("a9");
+    expect(seen).toEqual(["a1", null, "a9"]);
   });
 });
