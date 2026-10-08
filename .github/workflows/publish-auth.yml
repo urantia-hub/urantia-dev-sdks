@@ -13,6 +13,9 @@ jobs:
   # Everything that runs code from the repo or from a package happens here, with no right to publish.
   verify:
     runs-on: ubuntu-latest
+    outputs:
+      file: ${{ steps.pack.outputs.file }}
+      sha256: ${{ steps.pack.outputs.sha256 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -52,14 +55,21 @@ jobs:
 
       - run: npm test --workspace @urantia/auth
 
+      # The name and the hash of the file go to the publish job, which checks both before it uploads.
       - name: Pack
+        id: pack
         working-directory: packages/auth
-        run: npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP"
+        run: |
+          mkdir "$RUNNER_TEMP/out"
+          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/out"
+          FILE=$(ls "$RUNNER_TEMP/out")
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "$RUNNER_TEMP/out/$FILE" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:
           name: package
-          path: ${{ runner.temp }}/*.tgz
+          path: ${{ runner.temp }}/out/
           if-no-files-found: error
           retention-days: 1
 
@@ -80,5 +90,27 @@ jobs:
         with:
           name: package
 
+      # The file must be the one that verify made, and it must be this package at the tagged version.
+      - name: Check the file
+        env:
+          FILE: ${{ needs.verify.outputs.file }}
+          SHA256: ${{ needs.verify.outputs.sha256 }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ "$(ls -A | wc -l)" != "1" ] || [ ! -f "$FILE" ]; then
+            echo "::error::Expected exactly one file, named $FILE."; ls -A; exit 1
+          fi
+          echo "$SHA256  $FILE" | sha256sum --check --strict
+          tar -xzf "$FILE" package/package.json
+          NAME=$(node -p "require('./package/package.json').name")
+          VERSION=$(node -p "require('./package/package.json').version")
+          rm -rf package
+          if [ "$NAME@$VERSION" != "$REF_NAME" ]; then
+            echo "::error::The file holds $NAME@$VERSION, but the tag is $REF_NAME."; exit 1
+          fi
+
       - name: Publish to npm with provenance
-        run: npm publish ./*.tgz --provenance --access public
+        env:
+          FILE: ${{ needs.verify.outputs.file }}
+        run: npm publish "./$FILE" --provenance --access public
