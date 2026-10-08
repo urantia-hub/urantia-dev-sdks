@@ -249,3 +249,36 @@ describe("what is read from storage", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+// Third round of the commit scan. A storage event arrives late, so a tab cannot rely on it to know
+// that another tab signed out. The mark of a sign-out is in storage itself, which each tab reads at once.
+describe("a sign-out in another tab, before this tab hears of it", () => {
+  it("still stops a refresh that answers in this tab", async () => {
+    storage.set("urantia_auth_session", stored(30));
+    let answer: (r: Response) => void = () => {};
+    fetchMock.mockImplementation((url: string) =>
+      url.endsWith("/auth/refresh") ? new Promise<Response>((r) => (answer = r)) : Promise.resolve(json(200, { data: { signOutToken: null } })),
+    );
+    const tabA = make();
+    const tabB = make();
+    const refresh = tabB.refreshSession().catch(() => "stopped");
+    await tabA.signOut();
+    // No storage event reaches tab B here.
+    answer(json(200, tokens(15, "r-new")));
+    expect(await refresh).toBe("stopped");
+    await flush();
+    expect(storage.has("urantia_auth_session")).toBe(false);
+  });
+
+  it("lets a new sign-in work after a sign-out", async () => {
+    storage.set("urantia_auth_session", stored(30));
+    fetchMock.mockResolvedValue(json(200, { data: { signOutToken: null } }));
+    const auth = make();
+    await auth.signOut();
+    storage.set("urantia_auth_pkce", JSON.stringify({ codeVerifier: "v1", state: "s1" }));
+    fetchMock.mockResolvedValue(json(200, tokens(15)));
+    const session = await auth.handleCallback("https://app.example/callback?code=c1&state=s1");
+    expect(session.accessToken).toBe("a2");
+    expect(storage.has("urantia_auth_session")).toBe(true);
+  });
+});

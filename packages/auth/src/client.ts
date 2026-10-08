@@ -6,6 +6,8 @@ const DEFAULT_LOGIN_URL = "https://accounts.urantiahub.com";
 const DEFAULT_API_URL = "https://api.urantia.dev";
 const STORAGE_KEY = "urantia_auth_session";
 const PKCE_KEY = "urantia_auth_pkce";
+// The count of sign-outs in this browser. Each tab reads it at once, with no wait for a storage event.
+const SIGN_OUTS_KEY = "urantia_auth_sign_outs";
 // Refresh this long before the access token ends.
 const REFRESH_AHEAD_MS = 2 * 60 * 1000;
 
@@ -144,7 +146,7 @@ export class UrantiaAuth {
    */
   async signOut(options?: { returnTo?: string }): Promise<void> {
     const refreshToken = this.session?.refreshToken;
-    this.signOuts += 1;
+    this.markSignOut();
     this.clear();
     try {
       localStorage.removeItem(PKCE_KEY);
@@ -183,7 +185,7 @@ export class UrantiaAuth {
     const current = this.session;
     if (!current?.refreshToken) return Promise.reject(new Error("No refresh token."));
 
-    const startedAt = this.signOuts;
+    const startedAt = this.signOutCount();
     this.refreshing = refreshTokens({ appId: this.appId, refreshToken: current.refreshToken, apiUrl: this.apiUrl })
       .then((tokens) => this.keepUnlessSignedOut(tokens, startedAt))
       .catch((error) => {
@@ -207,8 +209,8 @@ export class UrantiaAuth {
 
   // Each request that ends in a session passes here. If the reader signed out while the request was
   // under way, the new pair is ended on the service and no session is kept.
-  private keepUnlessSignedOut(tokens: Tokens, startedAt: number): Session {
-    if (this.signOuts !== startedAt) {
+  private keepUnlessSignedOut(tokens: Tokens, startedAt: string): Session {
+    if (this.signOutCount() !== startedAt) {
       void revokeTokens({ appId: this.appId, refreshToken: tokens.refreshToken, apiUrl: this.apiUrl });
       throw new Error("Signed out.");
     }
@@ -216,7 +218,7 @@ export class UrantiaAuth {
   }
 
   private async finish(code: string, codeVerifier?: string): Promise<Session> {
-    const startedAt = this.signOuts;
+    const startedAt = this.signOutCount();
     const tokens = await exchangeCode({
       appId: this.appId,
       code,
@@ -226,6 +228,26 @@ export class UrantiaAuth {
       apiUrl: this.apiUrl,
     });
     return this.keepUnlessSignedOut(tokens, startedAt);
+  }
+
+  // The sign-outs that this client knows of: its own, and those of each other tab of this browser.
+  private signOutCount(): string {
+    let shared = "";
+    try {
+      shared = localStorage.getItem(SIGN_OUTS_KEY) ?? "";
+    } catch {
+      // Storage is not available.
+    }
+    return `${this.signOuts}:${shared}`;
+  }
+
+  private markSignOut(): void {
+    this.signOuts += 1;
+    try {
+      localStorage.setItem(SIGN_OUTS_KEY, String(Number(localStorage.getItem(SIGN_OUTS_KEY) ?? "0") + 1));
+    } catch {
+      // Storage is not available. The count in memory still holds for this tab.
+    }
   }
 
   private keep(session: Session): Session {
