@@ -95,7 +95,7 @@ export class UrantiaAuth {
     // The same name as the server entry sends. The sign-in page reads one name for both.
     if (scopes.length > 0) params.set("scope", scopes.join(","));
     // The reader is still signed in on the accounts site after a sign-out with no redirect.
-    // So this sign-in is not silent: the accounts site asks "Continue as …?".
+    // So this sign-in is not silent: the accounts site shows its sign-in page.
     if (this.willAskAccount()) params.set("prompt", "select_account");
     const loginPageUrl = `${this.loginUrl}/login?${params}`;
 
@@ -162,7 +162,7 @@ export class UrantiaAuth {
 
   /**
    * Sign out. The sign-in in this browser ends at once, and the service is told in the background.
-   * The page does not leave your app. The reader's next sign-in asks which account to use.
+   * The page does not leave your app. The reader's next sign-in is not silent: the accounts site shows its sign-in page.
    *
    * With `returnTo` (an address that your app registered), the page then goes to the accounts site,
    * which ends the UrantiaHub account session too and sends the reader back. Use it for a sign-out

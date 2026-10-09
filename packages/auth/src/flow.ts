@@ -48,7 +48,7 @@ export async function createAuthorizeUrl(input: {
   redirectUri: string;
   scopes: string[];
   /**
-   * Ask the reader which account to use ("Continue as …?"), in place of a silent sign-in.
+   * Show the sign-in page of the accounts site, in place of a silent sign-in.
    * Pass true for the first sign-in after your app signed the reader out without `signOutUrl`.
    */
   askAccount?: boolean;
