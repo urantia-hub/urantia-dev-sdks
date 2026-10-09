@@ -47,6 +47,11 @@ export async function createAuthorizeUrl(input: {
   appId: string;
   redirectUri: string;
   scopes: string[];
+  /**
+   * Ask the reader which account to use ("Continue as …?"), in place of a silent sign-in.
+   * Pass true for the first sign-in after your app signed the reader out without `signOutUrl`.
+   */
+  askAccount?: boolean;
   loginUrl?: string;
 }): Promise<{ url: string; state: string; codeVerifier: string }> {
   const { codeVerifier, codeChallenge } = await generatePKCE();
@@ -58,6 +63,7 @@ export async function createAuthorizeUrl(input: {
     code_challenge: codeChallenge,
   });
   if (input.scopes.length > 0) params.set("scope", input.scopes.join(","));
+  if (input.askAccount) params.set("prompt", "select_account");
   return { url: `${trim(input.loginUrl ?? DEFAULT_LOGIN_URL)}/login?${params}`, state, codeVerifier };
 }
 
