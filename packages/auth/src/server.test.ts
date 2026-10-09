@@ -29,6 +29,14 @@ async function s256(verifier: string): Promise<string> {
 }
 
 describe("createAuthorizeUrl", () => {
+  // After a sign-out with no trip to the accounts site, the next sign-in must not be silent.
+  it("asks which account when the app says so, and not by itself", async () => {
+    const base = { appId: "my-app", redirectUri: "https://app.example/callback", scopes: ["profile"] };
+    expect(new URL((await createAuthorizeUrl({ ...base, askAccount: true })).url).searchParams.get("prompt")).toBe("select_account");
+    expect(new URL((await createAuthorizeUrl(base)).url).searchParams.has("prompt")).toBe(false);
+    expect(new URL((await createAuthorizeUrl({ ...base, askAccount: false })).url).searchParams.has("prompt")).toBe(false);
+  });
+
   it("makes a URL to the sign-in page with the app, the address, the permissions, the state, and an S256 challenge", async () => {
     const { url, state, codeVerifier } = await createAuthorizeUrl({
       appId: "my-app",

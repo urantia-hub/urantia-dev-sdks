@@ -296,3 +296,86 @@ describe("the address of the sign-in page", () => {
     expect(url.searchParams.get("code_challenge")).toBeTruthy();
   });
 });
+
+// signOut() needs no trip to the accounts site. The reader stays signed in there, so the next sign-in
+// must not be silent: it asks "Continue as …?".
+describe("the sign-in after a sign-out with no redirect", () => {
+  const startUrl = async (auth: UrantiaAuth) => {
+    void auth.signIn({ scopes: ["profile"], mode: "redirect" });
+    await flush();
+    await flush();
+    return new URL(location.href);
+  };
+
+  it("does not leave the page at the sign-out", async () => {
+    storage.set("urantia_auth_session", stored(15));
+    fetchMock.mockResolvedValue(json(200, { signOutToken: "t1" }));
+    const auth = make();
+    await auth.signOut();
+    expect(location.href).toBe("https://app.example/");
+    expect(auth.getSession()).toBeNull();
+  });
+
+  it("asks which account", async () => {
+    storage.set("urantia_auth_session", stored(15));
+    fetchMock.mockResolvedValue(json(200, { signOutToken: "t1" }));
+    const auth = make();
+    await auth.signOut();
+    expect((await startUrl(auth)).searchParams.get("prompt")).toBe("select_account");
+  });
+
+  it("asks in another tab of the app too, and after the page loads again", async () => {
+    storage.set("urantia_auth_session", stored(15));
+    fetchMock.mockResolvedValue(json(200, { signOutToken: "t1" }));
+    await make().signOut();
+    expect((await startUrl(make())).searchParams.get("prompt")).toBe("select_account");
+  });
+
+  it("does not ask on a first sign-in", async () => {
+    expect((await startUrl(make())).searchParams.has("prompt")).toBe(false);
+  });
+
+  it("stops asking after the reader signed in again", async () => {
+    storage.set("urantia_auth_session", stored(15));
+    fetchMock.mockResolvedValueOnce(json(200, { signOutToken: "t1" }));
+    const auth = make();
+    await auth.signOut();
+    storage.set("urantia_auth_pkce", JSON.stringify({ codeVerifier: "v1", state: "s1" }));
+    fetchMock.mockResolvedValueOnce(json(200, tokens(15)));
+    expect(storage.has("urantia_auth_ask_account")).toBe(true);
+    await auth.handleCallback("https://app.example/callback?code=c1&state=s1");
+    expect(storage.has("urantia_auth_ask_account")).toBe(false);
+  });
+
+  // The full trip can fail to end the session on the accounts site: no token to revoke, or the reader
+  // does not confirm there. So each sign-out asks at the next sign-in, and only a sign-in stops that.
+  it("asks after a sign-out with a return address too", async () => {
+    storage.set("urantia_auth_session", stored(15));
+    fetchMock.mockResolvedValue(json(200, { signOutToken: "t1" }));
+    await make().signOut({ returnTo: "https://app.example/" });
+    expect(storage.has("urantia_auth_ask_account")).toBe(true);
+  });
+
+  it("asks after a sign-out with no session to revoke", async () => {
+    const auth = make();
+    await auth.signOut({ returnTo: "https://app.example/" });
+    expect((await startUrl(auth)).searchParams.get("prompt")).toBe("select_account");
+  });
+
+  // A browser can refuse storage. The page that signed out must still ask.
+  it("asks in the same page when the browser gives no storage", async () => {
+    storage.set("urantia_auth_session", stored(15));
+    fetchMock.mockResolvedValue(json(200, { signOutToken: "t1" }));
+    const auth = make();
+    vi.stubGlobal("localStorage", {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("no storage");
+      },
+      removeItem: () => {},
+    });
+    await auth.signOut();
+    // signIn() needs storage for its own data, so read the question from the client itself.
+    expect(auth.willAskAccount()).toBe(true);
+  });
+});

@@ -8,6 +8,18 @@ const STORAGE_KEY = "urantia_auth_session";
 const PKCE_KEY = "urantia_auth_pkce";
 // The count of sign-outs in this browser. Each tab reads it at once, with no wait for a storage event.
 const SIGN_OUTS_KEY = "urantia_auth_sign_outs";
+// Set by a sign-out with no trip to the accounts site. The next sign-in then asks which account.
+const ASK_ACCOUNT_KEY = "urantia_auth_ask_account";
+
+function storageFlag(key: string, value?: boolean): boolean {
+  try {
+    if (value === true) localStorage.setItem(key, "1");
+    else if (value === false) localStorage.removeItem(key);
+    return localStorage.getItem(key) !== null;
+  } catch {
+    return false;
+  }
+}
 // Refresh this long before the access token ends.
 const REFRESH_AHEAD_MS = 2 * 60 * 1000;
 
@@ -34,6 +46,8 @@ export class UrantiaAuth {
   private refreshing: Promise<Session> | null = null;
   // Counts the sign-outs. A refresh that answers after a sign-out must not sign the reader in again.
   private signOuts = 0;
+  // This page signed out. Kept here too, for a browser that gives no storage.
+  private askAccount = false;
 
   constructor(options: UrantiaAuthOptions) {
     this.appId = options.appId;
@@ -80,6 +94,9 @@ export class UrantiaAuth {
     const scopes = options?.scopes ?? [];
     // The same name as the server entry sends. The sign-in page reads one name for both.
     if (scopes.length > 0) params.set("scope", scopes.join(","));
+    // The reader is still signed in on the accounts site after a sign-out with no redirect.
+    // So this sign-in is not silent: the accounts site asks "Continue as …?".
+    if (this.willAskAccount()) params.set("prompt", "select_account");
     const loginPageUrl = `${this.loginUrl}/login?${params}`;
 
     if ((options?.mode ?? "popup") === "redirect") {
@@ -138,8 +155,14 @@ export class UrantiaAuth {
     return this.finish(code, codeVerifier);
   }
 
+  /** True when the next sign-in asks the reader which account to use: after a sign-out, until a sign-in. */
+  willAskAccount(): boolean {
+    return this.askAccount || storageFlag(ASK_ACCOUNT_KEY);
+  }
+
   /**
    * Sign out. The sign-in in this browser ends at once, and the service is told in the background.
+   * The page does not leave your app. The reader's next sign-in asks which account to use.
    *
    * With `returnTo` (an address that your app registered), the page then goes to the accounts site,
    * which ends the UrantiaHub account session too and sends the reader back. Use it for a sign-out
@@ -149,6 +172,11 @@ export class UrantiaAuth {
     const refreshToken = this.session?.refreshToken;
     this.markSignOut();
     this.clear();
+    // The reader can still be signed in on the accounts site: with no trip there, and also when the
+    // trip does not end that session. So each sign-out makes the next sign-in ask which account.
+    // Only a finished sign-in stops that.
+    this.askAccount = true;
+    storageFlag(ASK_ACCOUNT_KEY, true);
     try {
       localStorage.removeItem(PKCE_KEY);
     } catch {
@@ -228,7 +256,11 @@ export class UrantiaAuth {
       appSecret: this.appSecret,
       apiUrl: this.apiUrl,
     });
-    return this.keepUnlessSignedOut(tokens, startedAt);
+    const session = await this.keepUnlessSignedOut(tokens, startedAt);
+    // The reader signed in again, so the next sign-in does not need the question.
+    this.askAccount = false;
+    storageFlag(ASK_ACCOUNT_KEY, false);
+    return session;
   }
 
   // The sign-outs that this client knows of: its own, and those of each other tab of this browser.
