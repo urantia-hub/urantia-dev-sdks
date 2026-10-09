@@ -347,12 +347,35 @@ describe("the sign-in after a sign-out with no redirect", () => {
     expect(storage.has("urantia_auth_ask_account")).toBe(false);
   });
 
-  // The full trip ends the session on the accounts site, so there is no one to continue as.
-  it("does not ask after a sign-out with a return address", async () => {
+  // The full trip can fail to end the session on the accounts site: no token to revoke, or the reader
+  // does not confirm there. So each sign-out asks at the next sign-in, and only a sign-in stops that.
+  it("asks after a sign-out with a return address too", async () => {
+    storage.set("urantia_auth_session", stored(15));
+    fetchMock.mockResolvedValue(json(200, { signOutToken: "t1" }));
+    await make().signOut({ returnTo: "https://app.example/" });
+    expect(storage.has("urantia_auth_ask_account")).toBe(true);
+  });
+
+  it("asks after a sign-out with no session to revoke", async () => {
+    const auth = make();
+    await auth.signOut({ returnTo: "https://app.example/" });
+    expect((await startUrl(auth)).searchParams.get("prompt")).toBe("select_account");
+  });
+
+  // A browser can refuse storage. The page that signed out must still ask.
+  it("asks in the same page when the browser gives no storage", async () => {
     storage.set("urantia_auth_session", stored(15));
     fetchMock.mockResolvedValue(json(200, { signOutToken: "t1" }));
     const auth = make();
-    await auth.signOut({ returnTo: "https://app.example/" });
-    expect(storage.has("urantia_auth_ask_account")).toBe(false);
+    vi.stubGlobal("localStorage", {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("no storage");
+      },
+      removeItem: () => {},
+    });
+    await auth.signOut();
+    // signIn() needs storage for its own data, so read the question from the client itself.
+    expect(auth.willAskAccount()).toBe(true);
   });
 });

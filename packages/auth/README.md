@@ -115,7 +115,7 @@ A token reaches only what its scopes allow: `profile`, `bookmarks`, `notes`, `re
 
 - A sign-out needs no redirect. `signOut()` in the browser stays on your page, and the next `signIn()` asks the person which account to use ("Continue as …?").
 - New option `askAccount` for `createAuthorizeUrl` on the server, for the same question.
-- `signOut({ returnTo })` and `signOutUrl` are unchanged: they are the full sign-out, for a shared computer.
+- `signOut({ returnTo })` and `signOutUrl` are the full sign-out, for a shared computer. The sign-in after it asks too, in case the accounts session did not end.
 
 ## Changes in 0.3.0
 

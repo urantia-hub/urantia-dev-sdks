@@ -46,6 +46,8 @@ export class UrantiaAuth {
   private refreshing: Promise<Session> | null = null;
   // Counts the sign-outs. A refresh that answers after a sign-out must not sign the reader in again.
   private signOuts = 0;
+  // This page signed out. Kept here too, for a browser that gives no storage.
+  private askAccount = false;
 
   constructor(options: UrantiaAuthOptions) {
     this.appId = options.appId;
@@ -94,7 +96,7 @@ export class UrantiaAuth {
     if (scopes.length > 0) params.set("scope", scopes.join(","));
     // The reader is still signed in on the accounts site after a sign-out with no redirect.
     // So this sign-in is not silent: the accounts site asks "Continue as …?".
-    if (storageFlag(ASK_ACCOUNT_KEY)) params.set("prompt", "select_account");
+    if (this.willAskAccount()) params.set("prompt", "select_account");
     const loginPageUrl = `${this.loginUrl}/login?${params}`;
 
     if ((options?.mode ?? "popup") === "redirect") {
@@ -153,6 +155,11 @@ export class UrantiaAuth {
     return this.finish(code, codeVerifier);
   }
 
+  /** True when the next sign-in asks the reader which account to use: after a sign-out, until a sign-in. */
+  willAskAccount(): boolean {
+    return this.askAccount || storageFlag(ASK_ACCOUNT_KEY);
+  }
+
   /**
    * Sign out. The sign-in in this browser ends at once, and the service is told in the background.
    * The page does not leave your app. The reader's next sign-in asks which account to use.
@@ -165,8 +172,11 @@ export class UrantiaAuth {
     const refreshToken = this.session?.refreshToken;
     this.markSignOut();
     this.clear();
-    // With no trip to the accounts site, the reader stays signed in there. The next sign-in asks.
-    storageFlag(ASK_ACCOUNT_KEY, !options?.returnTo);
+    // The reader can still be signed in on the accounts site: with no trip there, and also when the
+    // trip does not end that session. So each sign-out makes the next sign-in ask which account.
+    // Only a finished sign-in stops that.
+    this.askAccount = true;
+    storageFlag(ASK_ACCOUNT_KEY, true);
     try {
       localStorage.removeItem(PKCE_KEY);
     } catch {
@@ -248,6 +258,7 @@ export class UrantiaAuth {
     });
     const session = await this.keepUnlessSignedOut(tokens, startedAt);
     // The reader signed in again, so the next sign-in does not need the question.
+    this.askAccount = false;
     storageFlag(ASK_ACCOUNT_KEY, false);
     return session;
   }
