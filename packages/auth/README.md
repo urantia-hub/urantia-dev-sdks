@@ -54,7 +54,7 @@ await revokeTokens({ appId, refreshToken })
 // Remember that this browser signed out (a short cookie), and at the next sign-in:
 const next = await createAuthorizeUrl({ appId, redirectUri, scopes, askAccount: true })
 
-// 4b. Or the full sign-out, for a shared computer: the accounts site ends its session too.
+// 4b. Optional: send the person to the accounts site, which asks if they want to sign out there too.
 const { signOutToken } = await revokeTokens({ appId, refreshToken })
 return Response.redirect(signOutUrl({ appId, returnTo: 'https://myapp.com/', signOutToken }))
 ```
@@ -63,8 +63,8 @@ Notes:
 
 - A refresh token works one time. Each refresh gives a new one, so save it each time. If two requests can refresh at the same moment, make them share one refresh.
 - `revokeTokens` never throws, so a sign-out goes on when the service is down. `revoked: false` means that the service did not confirm it.
-- A sign-out needs no redirect. After it the person is still signed in on the accounts site, so pass `askAccount: true` to the next `createAuthorizeUrl`. The accounts site then asks "Continue as …?" with "Use another account", and does not sign the person in by itself.
-- `signOutUrl` is the full sign-out: it sends the person to the accounts site, which ends the UrantiaHub account session too and returns to `returnTo`. `returnTo` must be an address that your app registered. Use it where other people use the same computer.
+- A sign-out needs no redirect. After it the person is still signed in on the accounts site, so pass `askAccount: true` to the next `createAuthorizeUrl`. The accounts site then shows its sign-in page, and does not sign the person in by itself.
+- `signOutUrl` sends the person to the accounts site, which asks "Sign out of your UrantiaHub account?". The person decides there: an app does not end the UrantiaHub account session by itself. Most apps do not need it. A person can also sign out on the account page, https://accounts.urantiahub.com.
 
 ### Check a token in your own backend
 
@@ -95,8 +95,8 @@ auth.onAuthStateChange((session) => {
 
 const token = auth.getToken() // null while a refresh is under way: listen for the change
 
-await auth.signOut()                                      // no redirect; the next signIn() asks "Continue as …?"
-await auth.signOut({ returnTo: 'https://myapp.com/' })     // the full sign-out: also the UrantiaHub account session
+await auth.signOut()                                      // no redirect; the next signIn() shows the sign-in page
+await auth.signOut({ returnTo: 'https://myapp.com/' })     // also asks the person, on the accounts site, to sign out there
 ```
 
 The session stays in `localStorage` after the access token ends, and the first use refreshes it. An outage does not sign the person out: only a refusal from the service does.
@@ -111,11 +111,15 @@ const res = await fetch('https://api.urantia.dev/me/bookmarks', {
 
 A token reaches only what its scopes allow: `profile`, `bookmarks`, `notes`, `reading-progress`, `preferences`.
 
+## Changes in 0.4.1
+
+- Words only. The accounts site shows its normal sign-in page after a sign-out (there is no "Continue as" screen), and `signOutUrl` leads to a question on the accounts site: an app does not end the UrantiaHub account session by itself.
+
 ## Changes in 0.4.0
 
-- A sign-out needs no redirect. `signOut()` in the browser stays on your page, and the next `signIn()` asks the person which account to use ("Continue as …?").
+- A sign-out needs no redirect. `signOut()` in the browser stays on your page, and the next `signIn()` is not silent: the accounts site shows its sign-in page.
 - New option `askAccount` for `createAuthorizeUrl` on the server, for the same question.
-- `signOut({ returnTo })` and `signOutUrl` are the full sign-out, for a shared computer. The sign-in after it asks too, in case the accounts session did not end.
+- `signOut({ returnTo })` and `signOutUrl` are unchanged in code.
 
 ## Changes in 0.3.0
 
