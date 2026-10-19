@@ -69,6 +69,26 @@ const { data: enriched } = await api.paragraphs.get('1:0.1', {
 })
 ```
 
+### World texts
+
+The Bible and 21 texts of the world's religions share one set of calls. A work id is `bible` or a
+work's slug (`api.works.list()` gives them all).
+
+```ts
+const { data: works } = await api.works.list()
+
+// Read a unit or a whole part
+const { data: verses } = await api.works.read('dhammapada', 'Dhp 21')
+
+// The Urantia paragraphs near it, and the passages of the other works near it
+const { data: up } = await api.works.urantiaParallels('dhammapada', 'Dhp 21')
+const { data: wp } = await api.works.workParallels('quran', 'Quran 2.255')
+
+// Search across all works, or in one with `work`
+const { data: hits } = await api.works.search({ q: 'golden rule', work: 'analects' })
+const { data: near } = await api.works.semanticSearch('the soul after death')
+```
+
 ## Authenticated Endpoints
 
 Pass a token to access user-specific endpoints:
@@ -115,6 +135,12 @@ await api.me.preferences.update({ theme: 'dark', fontSize: 16 })
 | `api.bible.verse(code, ch, v)` | GET | Single verse |
 | `api.bible.urantiaParallels(code, ch, v)` | GET | Top-10 UB paragraphs for a Bible verse |
 | `api.bible.semanticSearch(params)` | POST | Bible semantic search (each result includes top-N UB paragraphs) |
+| `api.works.list()` | GET | The Bible and the 21 texts of the world's religions |
+| `api.works.read(work, ref)` | GET | A unit or a whole part of a work |
+| `api.works.urantiaParallels(work, ref)` | GET | Top-10 UB paragraphs for one unit of a work |
+| `api.works.workParallels(work, ref)` | GET | Nearest passages of the other works for one unit |
+| `api.works.search(params)` | POST | Keyword search across the works |
+| `api.works.semanticSearch(params)` | POST | Semantic search across the works (each result includes top-N UB paragraphs) |
 | `api.audio.get(ref)` | GET | Audio URLs for paragraph |
 | `api.cite.get(ref, style)` | GET | Generate citation |
 | `api.embeddings.get(ref, opts?)` | GET | Embedding vector (`{ model: 'small' \| 'large' }`, default `large`) |

@@ -533,3 +533,105 @@ export interface UrantiaAPIOptions {
   /** Bearer token for authenticated endpoints */
   token?: string;
 }
+
+// ─── Works (the Bible and 21 texts of the world's religions, one shape) ───
+
+/** The kind of a work: a scripture, a classic, or a recorded text. */
+export type WorkKind = "scripture" | "classic" | "recorded";
+
+/** GET /works: one work beside the Papers. The id is "bible" or the slug of a text ("dhammapada"). */
+export interface Work {
+  id: string;
+  title: string;
+  religion: string;
+  tradition: string;
+  kind: WorkKind;
+  summary: string;
+  translator: string;
+  year: number | null;
+  refPrefix: string | null;
+  unitLabel: string;
+  units: number;
+  urantiaSection: string | null;
+}
+
+export interface WorksListResponse {
+  data: Work[];
+}
+
+/** The work of a passage, in short. */
+export interface WorkRef {
+  id: string;
+  title: string;
+  tradition: string;
+}
+
+/** A Urantia paragraph near a passage of a work. */
+export interface WorkUrantiaParallel {
+  standardReferenceId: string;
+  paperTitle: string;
+  sectionTitle: string | null;
+  text: string;
+  similarity: number;
+  rank: number;
+}
+
+/** One passage of a work, with the Urantia paragraphs near it. `url` is its public page, or null. */
+export interface WorkPassage {
+  work: WorkRef;
+  reference: string;
+  text: string;
+  url: string | null;
+  /** Keyword search only: how the passage matched. */
+  match?: "reference" | "exact" | "all" | "near";
+  /** Semantic search only. */
+  similarity?: number;
+  strength?: "strong" | "related" | "weak";
+  urantiaParallels: WorkUrantiaParallel[];
+}
+
+/** GET /works/{work}/{ref}: each passage of the reference, in order. */
+export interface WorkReadResponse {
+  data: WorkPassage[];
+}
+
+/** GET /works/{work}/{ref}/urantia-parallels */
+export interface WorkUrantiaParallelsResponse {
+  data: WorkPassage;
+}
+
+/** A passage of another work near this one. */
+export interface WorkParallel {
+  work: WorkRef;
+  reference: string;
+  text: string;
+  url: string | null;
+  similarity: number;
+}
+
+/** GET /works/{work}/{ref}/work-parallels: the parallels belong to the chunk that holds the passage. */
+export interface WorkParallelsResponse {
+  data: {
+    work: WorkRef;
+    reference: string;
+    text: string;
+    url: string | null;
+    chunk: { label: string; references: string[] };
+    parallels: WorkParallel[];
+  };
+}
+
+export interface WorksSearchParams {
+  q: string;
+  /** One work only: "bible" or a work id such as "dhammapada". */
+  work?: string;
+  page?: number;
+  limit?: number;
+  /** How many Urantia paragraphs to attach to each result (0..10, default 3). */
+  urantiaParallelLimit?: number;
+}
+
+export interface WorksSearchResponse {
+  data: WorkPassage[];
+  meta: PaginationMeta & { didYouMean?: string; related?: number };
+}
