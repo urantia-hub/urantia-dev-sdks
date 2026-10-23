@@ -1,4 +1,8 @@
-import type { PapersListResponse, PaperDetailResponse } from "../types.js";
+import type {
+  PapersListResponse,
+  PaperDetailResponse,
+  SupportedLanguage,
+} from "../types.js";
 
 /**
  * `include` options supported by the papers endpoints.
@@ -26,12 +30,15 @@ export class PapersEndpoint {
    *
    * Pass `{ include: "topEntities" }` to attach a per-paper aggregate of the
    * most-referenced named entities to each paper.
+   *
+   * Pass `{ lang: "es" }` for the Spanish titles.
    */
   async list(
-    options?: { include?: PaperListInclude }
+    options?: { include?: PaperListInclude; lang?: SupportedLanguage }
   ): Promise<PapersListResponse> {
     const params = new URLSearchParams();
     if (options?.include) params.set("include", options.include);
+    if (options?.lang) params.set("lang", options.lang);
     const qs = params.toString();
     const res = await fetch(
       `${this.baseUrl}/papers${qs ? `?${qs}` : ""}`,
@@ -51,13 +58,16 @@ export class PapersEndpoint {
    * without attaching per-paragraph mentions (lighter payload).
    *
    * Pass `{ include: "entities,topEntities" }` for both explicitly.
+   *
+   * Pass `{ lang: "es" }` for the Spanish title and paragraphs.
    */
   async get(
     id: string,
-    options?: { include?: PaperInclude }
+    options?: { include?: PaperInclude; lang?: SupportedLanguage }
   ): Promise<PaperDetailResponse> {
     const params = new URLSearchParams();
     if (options?.include) params.set("include", options.include);
+    if (options?.lang) params.set("lang", options.lang);
     const qs = params.toString();
     const res = await fetch(
       `${this.baseUrl}/papers/${id}${qs ? `?${qs}` : ""}`,

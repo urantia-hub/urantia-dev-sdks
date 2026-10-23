@@ -40,6 +40,7 @@ export type {
   SemanticSearchResponse,
   // Languages
   SupportedLanguage,
+  TranslationLabel,
   Language,
   LanguagesResponse,
   // Audio

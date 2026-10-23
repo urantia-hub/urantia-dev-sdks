@@ -173,3 +173,17 @@ describe("PapersEndpoint.get", () => {
 		);
 	});
 });
+
+describe("PapersEndpoint lang", () => {
+	it("list() forwards lang", async () => {
+		const { endpoint, fetchMock } = makePapers();
+		await endpoint.list({ lang: "es" });
+		expect(fetchMock.mock.calls[0]?.[0]).toBe(`${BASE_URL}/papers?lang=es`);
+	});
+
+	it("get() forwards include and lang together", async () => {
+		const { endpoint, fetchMock } = makePapers();
+		await endpoint.get("1", { include: "entities", lang: "es" });
+		expect(fetchMock.mock.calls[0]?.[0]).toBe(`${BASE_URL}/papers/1?include=entities&lang=es`);
+	});
+});
