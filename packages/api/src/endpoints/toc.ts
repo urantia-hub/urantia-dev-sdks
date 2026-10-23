@@ -1,4 +1,4 @@
-import type { TocResponse } from "../types.js";
+import type { SupportedLanguage, TocResponse } from "../types.js";
 
 export class TocEndpoint {
   constructor(
@@ -6,9 +6,10 @@ export class TocEndpoint {
     private headers: () => HeadersInit
   ) {}
 
-  /** Get the full table of contents (parts and papers). */
-  async get(): Promise<TocResponse> {
-    const res = await fetch(`${this.baseUrl}/toc`, {
+  /** Get the full table of contents (parts and papers). Pass `{ lang: "es" }` for Spanish titles. */
+  async get(options?: { lang?: SupportedLanguage }): Promise<TocResponse> {
+    const qs = options?.lang ? `?lang=${options.lang}` : "";
+    const res = await fetch(`${this.baseUrl}/toc${qs}`, {
       headers: this.headers(),
     });
     if (!res.ok) throw await toError(res);

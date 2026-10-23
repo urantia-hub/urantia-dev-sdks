@@ -141,6 +141,14 @@ export interface UrantiaParallel {
 
 // ─── Paragraphs ───
 
+/** A translated paragraph is a machine translation, released as CC0. */
+export interface TranslationLabel {
+  method: "machine";
+  license: "CC0-1.0";
+  /** `auto_checked`, or `needs_review` when a check flagged the paragraph. */
+  review: string | null;
+}
+
 export interface Paragraph {
   id: string;
   paperId: string;
@@ -153,7 +161,10 @@ export interface Paragraph {
   partId: string;
   text: string;
   htmlText: string;
+  /** The language of `text`. A paragraph with no translation stays `eng`. */
   language?: string;
+  /** Present on a translated paragraph. */
+  translation?: TranslationLabel;
   labels: string[];
   audio: Record<string, unknown> | null;
   /** Present when the request includes `entities`. */
