@@ -92,14 +92,18 @@ const { data: near } = await api.works.semanticSearch('the soul after death')
 ### Spanish
 
 All 197 papers are in Spanish: a machine translation, released as CC0. Pass `lang: 'es'` to the
-paper, paragraph, and table of contents calls. Each translated paragraph has `language: 'es'` and a
-`translation` label. Search stays English.
+paper, paragraph, search, and table of contents calls. Each translated paragraph has `language: 'es'` and a
+`translation` label. With `include`, the Papers parallels and the entity names are in Spanish too.
+Keyword search in Spanish ignores accents and reads "documento 1" as a reference. Semantic search takes
+a question in Spanish or English.
 
 ```ts
 const { data: toc } = await api.toc.get({ lang: 'es' })
 const { data: paper } = await api.papers.get('1', { lang: 'es' })
 const { data: p } = await api.paragraphs.get('1:0.1', { lang: 'es' })
 p.translation // { method: 'machine', license: 'CC0-1.0', review: 'auto_checked' }
+const { data: hits } = await api.search.fullText({ q: 'Ajustador del Pensamiento', lang: 'es' })
+const { data: near } = await api.search.semantic({ q: '¿Qué es el alma?', lang: 'es' })
 ```
 
 ## Authenticated Endpoints
