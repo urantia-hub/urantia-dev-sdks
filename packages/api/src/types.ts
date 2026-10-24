@@ -248,6 +248,8 @@ export interface SearchParams {
   partId?: string;
   /** Comma-separated string of any combination of "entities", "bibleParallels", "urantiaParallels". */
   include?: string;
+  /** "es" searches the Spanish text (accents optional; "documento 1" is a reference) and gives Spanish rows. */
+  lang?: "eng" | "es";
 }
 
 /** Search results are flat paragraph objects with an additional `rank` field. */
@@ -268,6 +270,8 @@ export interface SemanticSearchParams {
   partId?: string;
   /** Comma-separated string. Same accepted values as SearchParams.include. */
   include?: string;
+  /** "es" gives Spanish rows; the question can be in Spanish or English. */
+  lang?: "eng" | "es";
 }
 
 export type SemanticSearchResult = Paragraph & {
