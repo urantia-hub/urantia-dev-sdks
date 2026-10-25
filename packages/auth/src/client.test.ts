@@ -331,6 +331,14 @@ describe("the sign-in after a sign-out with no redirect", () => {
     expect((await startUrl(make())).searchParams.get("prompt")).toBe("select_account");
   });
 
+  it("asks for the language of the screens only when the app gives one", async () => {
+    void make().signIn({ scopes: ["profile"], mode: "redirect", uiLocales: "es" });
+    await flush();
+    await flush();
+    expect(new URL(location.href).searchParams.get("ui_locales")).toBe("es");
+    expect((await startUrl(make())).searchParams.has("ui_locales")).toBe(false);
+  });
+
   it("does not ask on a first sign-in", async () => {
     expect((await startUrl(make())).searchParams.has("prompt")).toBe(false);
   });

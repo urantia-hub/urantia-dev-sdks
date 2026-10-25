@@ -52,6 +52,8 @@ export async function createAuthorizeUrl(input: {
    * Pass true for the first sign-in after your app signed the reader out without `signOutUrl`.
    */
   askAccount?: boolean;
+  /** The language of the sign-in pages and the sign-in email, as `ui_locales` ("es" for Spanish). English when left out. */
+  uiLocales?: string;
   loginUrl?: string;
 }): Promise<{ url: string; state: string; codeVerifier: string }> {
   const { codeVerifier, codeChallenge } = await generatePKCE();
@@ -64,6 +66,7 @@ export async function createAuthorizeUrl(input: {
   });
   if (input.scopes.length > 0) params.set("scope", input.scopes.join(","));
   if (input.askAccount) params.set("prompt", "select_account");
+  if (input.uiLocales) params.set("ui_locales", input.uiLocales);
   return { url: `${trim(input.loginUrl ?? DEFAULT_LOGIN_URL)}/login?${params}`, state, codeVerifier };
 }
 

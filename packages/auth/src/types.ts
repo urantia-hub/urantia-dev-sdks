@@ -29,6 +29,8 @@ export interface SignInOptions {
   scopes?: string[];
   /** Use popup (default) or redirect flow in the browser. */
   mode?: "popup" | "redirect";
+  /** The language of the sign-in pages and the sign-in email, as `ui_locales` ("es" for Spanish). English when left out. */
+  uiLocales?: string;
 }
 
 export type AuthStateChangeCallback = (session: Session | null) => void;
