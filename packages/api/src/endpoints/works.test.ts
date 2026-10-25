@@ -39,6 +39,16 @@ describe("WorksEndpoint", () => {
 		expect(call(fetchMock)[0]).toBe(`${BASE_URL}/works/bible/Daniel%20(Greek)%203%3A5`);
 	});
 
+	it("asks the Spanish catalog words with lang", async () => {
+		const { endpoint, fetchMock } = makeWorks();
+		await endpoint.list({ lang: "es" });
+		await endpoint.read("dhammapada", "Dhp 1", { lang: "es" });
+		await endpoint.read("dhammapada", "Dhp 1", {});
+		expect(call(fetchMock, 0)[0]).toBe(`${BASE_URL}/works?lang=es`);
+		expect(call(fetchMock, 1)[0]).toBe(`${BASE_URL}/works/dhammapada/Dhp%201?lang=es`);
+		expect(call(fetchMock, 2)[0]).toBe(`${BASE_URL}/works/dhammapada/Dhp%201`);
+	});
+
 	it("asks the Urantia parallels and the parallels in the other works of one unit", async () => {
 		const { endpoint, fetchMock } = makeWorks(200, { data: {} });
 		await endpoint.urantiaParallels("dhammapada", "Dhp 21");

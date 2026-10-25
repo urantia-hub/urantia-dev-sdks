@@ -359,6 +359,9 @@ export interface EmbeddingsExportResponse {
 
 export type BibleCanon = "ot" | "deuterocanon" | "nt";
 
+/** Language of the catalog words of the works and the Bible book names. The text of the works stays English. */
+export type CatalogLanguage = "eng" | "es";
+
 export interface BibleBook {
   bookCode: string;
   bookName: string;
@@ -368,6 +371,8 @@ export interface BibleBook {
   canon: BibleCanon;
   chapterCount: number;
   verseCount: number;
+  /** With `lang: "es"`: the book names are a machine translation, released as CC0. */
+  catalogTranslation?: TranslationLabel;
 }
 
 export interface BibleVerse {
@@ -568,6 +573,10 @@ export interface Work {
   unitLabel: string;
   units: number;
   urantiaSection: string | null;
+  /** The language of the text of the work: the source works are English. */
+  textLanguage: "eng";
+  /** With `lang: "es"`: the catalog words are a machine translation, released as CC0. */
+  catalogTranslation?: TranslationLabel;
 }
 
 export interface WorksListResponse {
@@ -579,6 +588,8 @@ export interface WorkRef {
   id: string;
   title: string;
   tradition: string;
+  textLanguage: "eng";
+  catalogTranslation?: TranslationLabel;
 }
 
 /** A Urantia paragraph near a passage of a work. */

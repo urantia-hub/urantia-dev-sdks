@@ -1,4 +1,5 @@
 import type {
+  CatalogLanguage,
   BibleBookResponse,
   BibleBooksResponse,
   BibleChapterResponse,
@@ -14,9 +15,10 @@ export class BibleEndpoint {
     private headers: () => HeadersInit
   ) {}
 
-  /** List all 81 books in the World English Bible (eng-web), with chapter/verse counts. */
-  async books(): Promise<BibleBooksResponse> {
-    const res = await fetch(`${this.baseUrl}/bible/books`, {
+  /** List all 81 books in the World English Bible (eng-web), with chapter/verse counts. Pass `{ lang: "es" }` for the Spanish names. */
+  async books(options?: { lang?: CatalogLanguage }): Promise<BibleBooksResponse> {
+    const query = options?.lang ? `?lang=${options.lang}` : "";
+    const res = await fetch(`${this.baseUrl}/bible/books${query}`, {
       headers: this.headers(),
     });
     if (!res.ok) throw await toError(res);
