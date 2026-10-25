@@ -1,4 +1,5 @@
 import type {
+  CatalogLanguage,
   WorkParallelsResponse,
   WorkReadResponse,
   WorksListResponse,
@@ -14,17 +15,18 @@ export class WorksEndpoint {
     private headers: () => HeadersInit
   ) {}
 
-  /** List the works beside the Papers. */
-  async list(): Promise<WorksListResponse> {
-    return this.get("/works");
+  /** List the works beside the Papers. Pass `{ lang: "es" }` for the Spanish titles, traditions, and summaries. */
+  async list(options?: { lang?: CatalogLanguage }): Promise<WorksListResponse> {
+    return this.get(`/works${langQuery(options?.lang)}`);
   }
 
   /**
    * Read a work by reference: a unit ("Dhp 21", "John 3:16") or a whole part ("Quran 2", "John 3").
-   * A Bible reference takes the book name or code.
+   * A Bible reference takes the book name or code. Pass `{ lang: "es" }` for the Spanish work title;
+   * the text stays English.
    */
-  async read(work: string, ref: string): Promise<WorkReadResponse> {
-    return this.get(`/works/${encodeURIComponent(work)}/${encodeURIComponent(ref)}`);
+  async read(work: string, ref: string, options?: { lang?: CatalogLanguage }): Promise<WorkReadResponse> {
+    return this.get(`/works/${encodeURIComponent(work)}/${encodeURIComponent(ref)}${langQuery(options?.lang)}`);
   }
 
   /** The top 10 Urantia paragraphs for one unit of a work. */
@@ -64,6 +66,8 @@ export class WorksEndpoint {
     return res.json() as Promise<T>;
   }
 }
+
+const langQuery = (lang?: CatalogLanguage) => (lang ? `?lang=${lang}` : "");
 
 async function toError(res: Response): Promise<Error> {
   const body = await res.json().catch(() => null);

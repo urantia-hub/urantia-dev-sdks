@@ -106,6 +106,16 @@ const { data: hits } = await api.search.fullText({ q: 'Ajustador del Pensamiento
 const { data: near } = await api.search.semantic({ q: '¿Qué es el alma?', lang: 'es' })
 ```
 
+The works beside the Papers are English texts. With `lang: 'es'`, the works calls give their catalog
+words in Spanish (titles, traditions, summaries, labels) and the Bible book names in Spanish, with a
+`catalogTranslation` label. The text of each work stays English (`textLanguage: 'eng'`).
+
+```ts
+const { data: works } = await api.works.list({ lang: 'es' })
+const { data: verses } = await api.works.read('dhammapada', 'Dhp 21', { lang: 'es' })
+const { data: books } = await api.bible.books({ lang: 'es' })
+```
+
 ## Authenticated Endpoints
 
 Pass a token to access user-specific endpoints:

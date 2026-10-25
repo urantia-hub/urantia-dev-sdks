@@ -41,6 +41,7 @@ export type {
   // Languages
   SupportedLanguage,
   TranslationLabel,
+  CatalogLanguage,
   Language,
   LanguagesResponse,
   // Audio
