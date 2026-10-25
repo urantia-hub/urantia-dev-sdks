@@ -97,6 +97,7 @@ export class UrantiaAuth {
     // The reader is still signed in on the accounts site after a sign-out with no redirect.
     // So this sign-in is not silent: the accounts site shows its sign-in page.
     if (this.willAskAccount()) params.set("prompt", "select_account");
+    if (options?.uiLocales) params.set("ui_locales", options.uiLocales);
     const loginPageUrl = `${this.loginUrl}/login?${params}`;
 
     if ((options?.mode ?? "popup") === "redirect") {

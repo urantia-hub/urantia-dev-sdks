@@ -64,6 +64,7 @@ Notes:
 - A refresh token works one time. Each refresh gives a new one, so save it each time. If two requests can refresh at the same moment, make them share one refresh.
 - `revokeTokens` never throws, so a sign-out goes on when the service is down. `revoked: false` means that the service did not confirm it.
 - A sign-out needs no redirect. After it the person is still signed in on the accounts site, so pass `askAccount: true` to the next `createAuthorizeUrl`. The accounts site then shows its sign-in page, and does not sign the person in by itself.
+- `uiLocales: 'es'` (on `createAuthorizeUrl`, or on `signIn()` in the browser) shows the sign-in pages and the sign-in email in Spanish. With no value they are English.
 - `signOutUrl` sends the person to the accounts site, which asks "Sign out of your UrantiaHub account?". The person decides there: an app does not end the UrantiaHub account session by itself. Most apps do not need it. A person can also sign out on the account page, https://accounts.urantiahub.com.
 
 ### Check a token in your own backend
@@ -110,6 +111,10 @@ const res = await fetch('https://api.urantia.dev/me/bookmarks', {
 ```
 
 A token reaches only what its scopes allow: `profile`, `bookmarks`, `notes`, `reading-progress`, `preferences`.
+
+## Changes in 0.5.0
+
+- New option `uiLocales` on `createAuthorizeUrl` and `signIn()`. It sends `ui_locales`, and the accounts site and the sign-in email follow it. Only `es` (and `es-*`) changes anything today.
 
 ## Changes in 0.4.1
 

@@ -37,6 +37,14 @@ describe("createAuthorizeUrl", () => {
     expect(new URL((await createAuthorizeUrl({ ...base, askAccount: false })).url).searchParams.has("prompt")).toBe(false);
   });
 
+  // The language of the screens and of the sign-in email (OIDC ui_locales).
+  it("asks for the language of the screens only when the app gives one", async () => {
+    const base = { appId: "my-app", redirectUri: "https://app.example/callback", scopes: ["profile"] };
+    expect(new URL((await createAuthorizeUrl({ ...base, uiLocales: "es" })).url).searchParams.get("ui_locales")).toBe("es");
+    expect(new URL((await createAuthorizeUrl(base)).url).searchParams.has("ui_locales")).toBe(false);
+    expect(new URL((await createAuthorizeUrl({ ...base, uiLocales: "" })).url).searchParams.has("ui_locales")).toBe(false);
+  });
+
   it("makes a URL to the sign-in page with the app, the address, the permissions, the state, and an S256 challenge", async () => {
     const { url, state, codeVerifier } = await createAuthorizeUrl({
       appId: "my-app",
