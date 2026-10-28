@@ -41,7 +41,7 @@
     "vitest": "^4.1.12"
   },
   "dependencies": {
-    "jose": "^6.2.12"
+    "jose": "^6.2.13"
   },
   "engines": {
     "node": ">=18"
