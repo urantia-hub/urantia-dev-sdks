@@ -57,11 +57,15 @@ class BookmarksEndpoint {
     private headers: () => HeadersInit
   ) {}
 
-  /** List bookmarks with optional filtering. */
+  /**
+   * List bookmarks with optional filtering. With `since` (ISO 8601, at most 90 days ago), only the
+   * bookmarks made or changed at or after it, and `deleted`. An older `since` gets a 410 error.
+   */
   async list(
-    options?: PaginationParams & { paperId?: string; category?: string }
+    options?: PaginationParams & { paperId?: string; category?: string; since?: string }
   ): Promise<BookmarksListResponse> {
     const params = new URLSearchParams();
+    if (options?.since) params.set("since", options.since);
     if (options?.page != null) params.set("page", String(options.page));
     if (options?.limit != null) params.set("limit", String(options.limit));
     if (options?.paperId) params.set("paperId", options.paperId);
@@ -116,9 +120,10 @@ class NotesEndpoint {
 
   /** List notes with optional filtering. */
   async list(
-    options?: PaginationParams & { paperId?: string; ref?: string }
+    options?: PaginationParams & { paperId?: string; ref?: string; since?: string }
   ): Promise<NotesListResponse> {
     const params = new URLSearchParams();
+    if (options?.since) params.set("since", options.since);
     if (options?.page != null) params.set("page", String(options.page));
     if (options?.limit != null) params.set("limit", String(options.limit));
     if (options?.paperId) params.set("paperId", options.paperId);

@@ -25,7 +25,10 @@ export interface Session {
 }
 
 export interface SignInOptions {
-  /** OAuth scopes to request (e.g. ['bookmarks', 'notes']). */
+  /**
+   * OAuth scopes to request (e.g. ['bookmarks', 'notes']). A read-only scope ('bookmarks:read',
+   * 'notes:read', 'reading-progress:read', 'preferences:read') allows GET only.
+   */
   scopes?: string[];
   /** Use popup (default) or redirect flow in the browser. */
   mode?: "popup" | "redirect";

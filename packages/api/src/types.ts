@@ -479,9 +479,33 @@ export interface Bookmark {
   paragraph: Paragraph;
 }
 
-export interface BookmarksListResponse {
+/** The page of a list of a reader's items, as /me answers it. */
+export interface ListPagination {
+  page: number;
+  limit: number;
+  total: number;
+}
+
+/** An item that the reader deleted after `since`. */
+export interface DeletedItem {
+  /** The id of the bookmark or the note. */
+  id: string;
+  /** The globalId of its paragraph, e.g. "1:2.0.1". */
+  paragraphId: string;
+  deletedAt: string;
+}
+
+/** The fields of a list for a sync. */
+export interface SyncFields {
+  /** Pass this as the next `since`. It is a little before the read, so an item can come two times: keep one item for each id. */
+  syncedAt: string;
+  /** Only with `since`: the items deleted at or after it. */
+  deleted?: DeletedItem[];
+}
+
+export interface BookmarksListResponse extends SyncFields {
   data: Bookmark[];
-  meta: PaginationMeta;
+  pagination: ListPagination;
 }
 
 export interface BookmarkCategory {
@@ -503,9 +527,9 @@ export interface Note {
   paragraph: Paragraph;
 }
 
-export interface NotesListResponse {
+export interface NotesListResponse extends SyncFields {
   data: Note[];
-  meta: PaginationMeta;
+  pagination: ListPagination;
 }
 
 export interface ReadingProgressEntry {
