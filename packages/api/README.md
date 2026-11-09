@@ -141,6 +141,17 @@ const { data: progress } = await api.me.readingProgress.get()
 await api.me.preferences.update({ theme: 'dark', fontSize: 16 })
 ```
 
+### Sync
+
+`since` returns only the bookmarks or notes that changed at or after a time, and the ones that were deleted. Store `syncedAt` and pass it as the next `since`. An item can come two times, so keep one item for each `id`. A `since` older than 90 days gets a 410 error: get the full list again.
+
+```typescript
+const changes = await api.me.bookmarks.list({ since: lastSyncedAt, limit: 100 })
+for (const bookmark of changes.data) save(bookmark)
+for (const gone of changes.deleted ?? []) remove(gone.id)
+lastSyncedAt = changes.syncedAt
+```
+
 ## All Endpoints
 
 | Endpoint | Method | Description |
