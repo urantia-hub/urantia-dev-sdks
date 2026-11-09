@@ -135,7 +135,10 @@ await api.me.bookmarks.create({ ref: '2:0.1', category: 'Favorites' })
 const { data: bookmarks } = await api.me.bookmarks.list()
 
 // Notes
-await api.me.notes.create({ ref: '2:0.1', text: 'Insightful passage' })
+const { data: note } = await api.me.notes.create({ ref: '2:0.1', text: 'Insightful passage' })
+// Send the updatedAt that you read. If another app changed the note since, this throws
+// NoteConflictError, and its `current` is the note as it is now.
+await api.me.notes.update(note.id, { text: 'Changed', updatedAt: note.updatedAt })
 
 // Reading progress
 await api.me.readingProgress.mark(['2:0.1', '2:0.2', '2:0.3'])
