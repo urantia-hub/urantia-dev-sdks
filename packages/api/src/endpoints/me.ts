@@ -152,16 +152,23 @@ class NotesEndpoint {
     return res.json();
   }
 
-  /** Update an existing note. */
+  /**
+   * Update a note. `updatedAt` is the value you read: the note changes only if nobody changed it
+   * since. Otherwise it throws `NoteConflictError`, whose `current` is the note as it is now.
+   */
   async update(
     id: string,
-    data: { text?: string; format?: "plain" | "markdown" }
+    data: { updatedAt: string; text?: string; format?: "plain" | "markdown" }
   ): Promise<{ data: Note }> {
     const res = await fetch(`${this.baseUrl}/me/notes/${id}`, {
       method: "PUT",
       headers: { ...this.headers(), "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
+    if (res.status === 409) {
+      const body = await res.json().catch(() => null);
+      throw new NoteConflictError(body?.detail || "The note changed.", body?.current);
+    }
     if (!res.ok) throw await toError(res);
     return res.json();
   }
@@ -238,6 +245,15 @@ class PreferencesEndpoint {
     });
     if (!res.ok) throw await toError(res);
     return res.json();
+  }
+}
+
+/** A note update that lost to a newer change. `current` is the note as it is now. */
+export class NoteConflictError extends Error {
+  readonly status = 409;
+  constructor(message: string, readonly current: Note) {
+    super(`409: ${message}`);
+    this.name = "NoteConflictError";
   }
 }
 

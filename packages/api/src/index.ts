@@ -1,4 +1,5 @@
 export { UrantiaAPI } from "./client.js";
+export { NoteConflictError } from "./endpoints/me.js";
 export type { PaperInclude, PaperListInclude } from "./endpoints/papers.js";
 export type {
   // Options
