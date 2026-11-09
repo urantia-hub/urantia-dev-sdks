@@ -51,6 +51,10 @@ para.urantiaParallels // top-10 most-similar UB paragraphs
 const { data: para2 } = await api.paragraphs.get('1:0.1', { include: 'bibleParallels' })
 para2.bibleParallels // top-10 nearest Bible chunks
 
+// UB paragraph → the 21 world religions texts (3 nearest of each)
+const { data: para3 } = await api.paragraphs.get('131:3.2', { include: 'scriptureParallels' })
+para3.scriptureParallels // e.g. [{ reference: 'Dhp 183', corpus: { title: 'The Dhammapada', ... }, similarity, url }]
+
 // 3. Bible verse → UB paragraphs
 const { data: bcv } = await api.bible.urantiaParallels('Matt', 5, 3)
 bcv.urantiaParallels // top-10 UB paragraphs for Matt 5:3
