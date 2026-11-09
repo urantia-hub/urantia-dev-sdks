@@ -117,9 +117,45 @@ export interface BibleParallel {
   similarity: number;
   /** 1..10 within the source. */
   rank: number;
-  /** Provenance label. "semantic" today; future curated layers (e.g. Faw's Paramony) would be tagged differently. */
+  /** How the parallel was made: "semantic" (computed by meaning). */
   source: string;
   embeddingModel: string;
+  /** The chapter page of the verse at ebible.org, or null. */
+  url?: string | null;
+}
+
+/** The work of a scripture parallel. */
+export interface ScriptureCorpusSummary {
+  id: string;
+  slug: string;
+  religion: string;
+  title: string;
+  translator: string;
+  year: number;
+  /** As in "Dhp 183". */
+  refPrefix: string;
+  /** The Paper 131 section headed with this religion, e.g. "131:3", or null. */
+  urantiaSection: string | null;
+}
+
+/**
+ * One passage of one of the 21 world religions texts near a Urantia paragraph in meaning.
+ * Returned on `?include=scriptureParallels`: the 3 nearest of each text.
+ */
+export interface ScriptureParallel {
+  chunkId: string;
+  /** Display reference, e.g. "Dhp 183". */
+  reference: string;
+  corpus: ScriptureCorpusSummary;
+  text: string;
+  /** Cosine similarity, 0..1. */
+  similarity: number;
+  /** 1..3 within its text. */
+  rank: number;
+  source: string;
+  embeddingModel: string;
+  /** The public page that holds the passage, or null. */
+  url: string | null;
 }
 
 /**
@@ -173,6 +209,8 @@ export interface Paragraph {
   bibleParallels?: BibleParallel[];
   /** Present when the request includes `urantiaParallels`. */
   urantiaParallels?: UrantiaParallel[];
+  /** Present when the request includes `scriptureParallels`. */
+  scriptureParallels?: ScriptureParallel[];
 }
 
 /**
@@ -182,7 +220,8 @@ export interface Paragraph {
 export type ParagraphInclude =
   | "entities"
   | "bibleParallels"
-  | "urantiaParallels";
+  | "urantiaParallels"
+  | "scriptureParallels";
 
 export interface ParagraphResponse {
   data: Paragraph;
@@ -246,7 +285,7 @@ export interface SearchParams {
   limit?: number;
   paperId?: string;
   partId?: string;
-  /** Comma-separated string of any combination of "entities", "bibleParallels", "urantiaParallels". */
+  /** Comma-separated string of any combination of "entities", "bibleParallels", "urantiaParallels", "scriptureParallels". */
   include?: string;
   /** "es" searches the Spanish text (accents optional; "documento 1" is a reference) and gives Spanish rows. */
   lang?: "eng" | "es";

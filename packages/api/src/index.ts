@@ -19,6 +19,8 @@ export type {
   // Paragraphs
   Paragraph,
   ParagraphInclude,
+  ScriptureCorpusSummary,
+  ScriptureParallel,
   ParagraphResponse,
   ParagraphContextResponse,
   // Parallels (cross-references)
