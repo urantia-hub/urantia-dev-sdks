@@ -11,6 +11,7 @@ import { CiteEndpoint } from "./endpoints/cite.js";
 import { EmbeddingsEndpoint } from "./endpoints/embeddings.js";
 import { FeedbackEndpoint } from "./endpoints/feedback.js";
 import { MeEndpoint } from "./endpoints/me.js";
+import { EditionsEndpoint } from "./endpoints/editions.js";
 import { LanguagesEndpoint } from "./endpoints/languages.js";
 
 const DEFAULT_BASE_URL = "https://api.urantia.dev";
@@ -43,6 +44,8 @@ export class UrantiaAPI {
   readonly feedback: FeedbackEndpoint;
   /** Available languages and translation progress. */
   readonly languages: LanguagesEndpoint;
+  /** The editions of the English text and the changes since 1955. */
+  readonly editions: EditionsEndpoint;
   /** Authenticated user endpoints (profile, bookmarks, notes, reading progress, preferences). Requires a token. */
   readonly me: MeEndpoint;
 
@@ -68,6 +71,7 @@ export class UrantiaAPI {
     this.embeddings = new EmbeddingsEndpoint(this.baseUrl, headers);
     this.feedback = new FeedbackEndpoint(this.baseUrl, headers);
     this.languages = new LanguagesEndpoint(this.baseUrl, headers);
+    this.editions = new EditionsEndpoint(this.baseUrl, headers);
     this.me = new MeEndpoint(this.baseUrl, headers);
   }
 }

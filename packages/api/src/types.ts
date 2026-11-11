@@ -93,6 +93,7 @@ export interface PaperDetailResponse {
   data: Paper & {
     paragraphs: Paragraph[];
   };
+  meta?: EditionMeta;
 }
 
 // ─── Parallels (cross-references) ───
@@ -211,6 +212,10 @@ export interface Paragraph {
   urantiaParallels?: UrantiaParallel[];
   /** Present when the request includes `scriptureParallels`. */
   scriptureParallels?: ScriptureParallel[];
+  /** The id of the edition of `text`, such as `srt-2024` or `1955`. */
+  edition?: string;
+  /** Present when the request includes `variants`: the changes to this paragraph since 1955. */
+  variants?: Variant[];
 }
 
 /**
@@ -221,10 +226,12 @@ export type ParagraphInclude =
   | "entities"
   | "bibleParallels"
   | "urantiaParallels"
-  | "scriptureParallels";
+  | "scriptureParallels"
+  | "variants";
 
 export interface ParagraphResponse {
   data: Paragraph;
+  meta?: EditionMeta;
 }
 
 export interface ParagraphContextResponse {
@@ -233,6 +240,58 @@ export interface ParagraphContextResponse {
     before: Paragraph[];
     after: Paragraph[];
   };
+  meta?: EditionMeta;
+}
+
+// ─── Editions ───
+
+/**
+ * An edition of the English text: `1955` (first printing), `srt-2009`, `srt-2015`, `srt-2018`,
+ * `srt-2021`, or `srt-2024` (the default). The API also accepts the Foundation's number (`1.22`,
+ * `21`) or a version stamp.
+ */
+export type EditionId = "1955" | "srt-2009" | "srt-2015" | "srt-2018" | "srt-2021" | "srt-2024";
+
+export interface Edition {
+  id: string;
+  label: string;
+  year: number;
+  foundationVersion: string | null;
+  versionStamp: string | null;
+}
+
+export interface EditionMeta {
+  /** The edition of the text in this answer. */
+  edition: Edition;
+}
+
+/** One change to the text since 1955. */
+export interface Variant {
+  /** The year of the committee report that adopted it; null when no report lists it. */
+  year: number | null;
+  /** text: words or punctuation. format: italics only. printing: a fault of the printed 1955 book. */
+  kind: "text" | "format" | "printing";
+  /** The words before the change (the 1955 wording). */
+  before: string;
+  after: string;
+  /** True when the default edition has the change. */
+  applied: boolean;
+  source: { list: string | null; report: string | null };
+  /** Present when no Foundation list records the change: it was found in the 1955 page photos. */
+  foundBy?: "scan";
+  page1955: string | null;
+  reason: string | null;
+  note?: string;
+}
+
+export interface EditionsResponse {
+  data: (Edition & { default: boolean; changes: number })[];
+  meta: { default: string; variants: number };
+}
+
+export interface VariantsResponse {
+  data: (Variant & { ref: string })[];
+  meta: { total: number };
 }
 
 // ─── Entities ───
