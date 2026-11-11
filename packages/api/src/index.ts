@@ -14,6 +14,7 @@ export type {
   TocResponse,
   // Papers
   Paper,
+  PaperDetail,
   TopEntity,
   PapersListResponse,
   PaperDetailResponse,

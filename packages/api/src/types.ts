@@ -66,10 +66,10 @@ export interface VideoVariant {
 export interface Paper {
   id: string;
   title: string;
-  author: string;
   partId: string;
-  partTitle: string;
-  paragraphCount: number;
+  /** Sorts the papers in reading order, for example "1.001.000.000". */
+  sortId: string;
+  labels: string[] | null;
   video: Record<string, VideoVariant> | null;
   /**
    * Paper-level aggregate of the most-referenced named entities in this paper,
@@ -78,6 +78,12 @@ export interface Paper {
    * includes `topEntities` (alone or combined with `entities`).
    */
   topEntities?: TopEntity[];
+}
+
+/** A paper in `papers.get`: the list fields and the audio of the whole paper. */
+export interface PaperDetail extends Paper {
+  /** The audio of the whole paper by model and voice, with the start time of each item. Null when there is none. */
+  audio: Record<string, unknown> | null;
 }
 
 export interface TopEntity extends EntityMention {
@@ -90,7 +96,8 @@ export interface PapersListResponse {
 }
 
 export interface PaperDetailResponse {
-  data: Paper & {
+  data: {
+    paper: PaperDetail;
     paragraphs: Paragraph[];
   };
   meta?: EditionMeta;

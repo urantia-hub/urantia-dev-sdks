@@ -28,10 +28,9 @@ const _invalidListInclude: PaperListInclude = "entities";
 const samplePaper: Paper = {
 	id: "1",
 	title: "The Universal Father",
-	author: "",
 	partId: "1",
-	partTitle: "Part I",
-	paragraphCount: 60,
+	sortId: "1.001.000.000",
+	labels: null,
 	video: null,
 };
 
@@ -79,3 +78,15 @@ describe("PapersEndpoint public surface", () => {
 		expect(typeof endpoint.get).toBe("function");
 	});
 });
+
+// ─── PaperDetailResponse has the shape that GET /papers/{id} answers ───
+
+const sampleDetail: import("../types.js").PaperDetailResponse = {
+	data: {
+		paper: { ...samplePaper, audio: null },
+		paragraphs: [],
+	},
+};
+expectType<string>(sampleDetail.data.paper.title);
+// @ts-expect-error — the paragraphs are beside the paper, not on it
+sampleDetail.data.paper.paragraphs;
