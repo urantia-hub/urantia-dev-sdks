@@ -1,4 +1,5 @@
 import type {
+  EditionId,
   ParagraphResponse,
   ParagraphContextResponse,
   SupportedLanguage,
@@ -7,11 +8,13 @@ import type {
 interface ParagraphOptions {
   /**
    * Comma-separated string of any combination of `entities`, `bibleParallels`,
-   * `urantiaParallels`. Example: `"entities,bibleParallels,urantiaParallels"`.
+   * `urantiaParallels`, `scriptureParallels`, `variants`. Example: `"entities,variants"`.
    */
   include?: string;
   format?: "rag";
   lang?: SupportedLanguage;
+  /** The edition of the English text. Default `srt-2024`. Another edition needs `lang` `eng`. */
+  edition?: EditionId | (string & {});
 }
 
 export class ParagraphsEndpoint {
@@ -37,6 +40,7 @@ export class ParagraphsEndpoint {
     if (options?.include) params.set("include", options.include);
     if (options?.format) params.set("format", options.format);
     if (options?.lang) params.set("lang", options.lang);
+    if (options?.edition) params.set("edition", options.edition);
     if (options?.minLength != null) params.set("minLength", String(options.minLength));
     if (options?.maxLength != null) params.set("maxLength", String(options.maxLength));
     const qs = params.toString();
@@ -58,6 +62,7 @@ export class ParagraphsEndpoint {
     if (options?.format) params.set("format", options.format);
     if (options?.window != null) params.set("window", String(options.window));
     if (options?.lang) params.set("lang", options.lang);
+    if (options?.edition) params.set("edition", options.edition);
     const qs = params.toString();
     const res = await fetch(
       `${this.baseUrl}/paragraphs/${encodeURIComponent(ref)}/context${qs ? `?${qs}` : ""}`,
@@ -74,6 +79,7 @@ function buildParams(options?: ParagraphOptions): string {
   if (options.include) params.set("include", options.include);
   if (options.format) params.set("format", options.format);
   if (options.lang) params.set("lang", options.lang);
+  if (options.edition) params.set("edition", options.edition);
   const qs = params.toString();
   return qs ? `?${qs}` : "";
 }

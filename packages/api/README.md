@@ -159,6 +159,21 @@ for (const gone of changes.deleted ?? []) remove(gone.id)
 lastSyncedAt = changes.syncedAt
 ```
 
+### Editions
+
+The default text is the Standard Reference Text of 2024 (the Foundation's download 1.22). Pass
+`edition` for an older one: `'1955'` (the first printing), `'srt-2009'`, `'srt-2015'`, `'srt-2018'`, or
+`'srt-2021'`. Older editions are English only. `include: 'variants'` gives each change to a paragraph
+since 1955, and each answer has `meta.edition`.
+
+```ts
+const { data: p, meta } = await api.paragraphs.get('98:3.8', { edition: '1955', include: 'variants' })
+meta?.edition.label // 'First printing (1955)'
+p.variants // [{ year: 2024, before: 'more than twoscore …', after: 'more than two-score …', … }]
+const { data: editions } = await api.editions.list()
+const { data: changes } = await api.editions.variants({ paper: 98 })
+```
+
 ## All Endpoints
 
 | Endpoint | Method | Description |
@@ -169,6 +184,8 @@ lastSyncedAt = changes.syncedAt
 | `api.paragraphs.get(ref)` | GET | Paragraph by reference |
 | `api.paragraphs.random()` | GET | Random paragraph |
 | `api.paragraphs.context(ref)` | GET | Paragraph with surrounding context |
+| `api.editions.list()` | GET | The editions of the English text, 1955 to 2024 |
+| `api.editions.variants(opts?)` | GET | The changes to the text since 1955 (`{ paper, ref, kind }`) |
 | `api.search.fullText(params)` | POST | Full-text search across UB paragraphs |
 | `api.search.semantic(params)` | POST | Semantic vector search across UB paragraphs |
 | `api.entities.list(options)` | GET | List entities |

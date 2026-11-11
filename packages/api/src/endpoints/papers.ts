@@ -1,4 +1,5 @@
 import type {
+  EditionId,
   PapersListResponse,
   PaperDetailResponse,
   SupportedLanguage,
@@ -10,11 +11,17 @@ import type {
  * - `"entities"` — per-paragraph entity mentions (detail endpoint only).
  * - `"topEntities"` — paper-level aggregate of most-cited entities.
  * - `"entities,topEntities"` — both, detail endpoint only.
+ * - `"variants"` — the changes to each paragraph since 1955 (detail endpoint only). It combines
+ *   with the others, such as `"entities,variants"`.
  */
 export type PaperInclude =
   | "entities"
   | "topEntities"
-  | "entities,topEntities";
+  | "entities,topEntities"
+  | "variants"
+  | "entities,variants"
+  | "topEntities,variants"
+  | "entities,topEntities,variants";
 
 /** `include` options for the list endpoint — only `topEntities` makes sense at list granularity. */
 export type PaperListInclude = "topEntities";
@@ -60,14 +67,21 @@ export class PapersEndpoint {
    * Pass `{ include: "entities,topEntities" }` for both explicitly.
    *
    * Pass `{ lang: "es" }` for the Spanish title and paragraphs.
+   *
+   * Pass `{ edition: "1955" }` for the text of an older edition (English only).
    */
   async get(
     id: string,
-    options?: { include?: PaperInclude; lang?: SupportedLanguage }
+    options?: {
+      include?: PaperInclude;
+      lang?: SupportedLanguage;
+      edition?: EditionId | (string & {});
+    }
   ): Promise<PaperDetailResponse> {
     const params = new URLSearchParams();
     if (options?.include) params.set("include", options.include);
     if (options?.lang) params.set("lang", options.lang);
+    if (options?.edition) params.set("edition", options.edition);
     const qs = params.toString();
     const res = await fetch(
       `${this.baseUrl}/papers/${id}${qs ? `?${qs}` : ""}`,

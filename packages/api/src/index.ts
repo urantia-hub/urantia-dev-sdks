@@ -24,6 +24,13 @@ export type {
   ScriptureParallel,
   ParagraphResponse,
   ParagraphContextResponse,
+  // Editions
+  EditionId,
+  Edition,
+  EditionMeta,
+  Variant,
+  EditionsResponse,
+  VariantsResponse,
   // Parallels (cross-references)
   BibleParallel,
   UrantiaParallel,
