@@ -67,7 +67,7 @@ export interface Paper {
   id: string;
   title: string;
   partId: string;
-  /** Sorts the papers in reading order, for example "1.001". */
+  /** Sorts the papers in reading order, for example "1.001.000.000". */
   sortId: string;
   labels: string[] | null;
   video: Record<string, VideoVariant> | null;

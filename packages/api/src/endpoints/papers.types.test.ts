@@ -29,7 +29,7 @@ const samplePaper: Paper = {
 	id: "1",
 	title: "The Universal Father",
 	partId: "1",
-	sortId: "1.001",
+	sortId: "1.001.000.000",
 	labels: null,
 	video: null,
 };
