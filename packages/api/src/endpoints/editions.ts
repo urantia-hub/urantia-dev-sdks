@@ -13,16 +13,28 @@ export class EditionsEndpoint {
     return res.json();
   }
 
-  /** List the changes to the text since 1955: all, or those of a paper, a paragraph, or a kind. */
+  /**
+   * List the changes to the text since 1955: all, or those of a paper, a paragraph, a kind, or one
+   * edition. `from` and `to` give each change between two editions (not with `edition`).
+   */
   async variants(options?: {
     paper?: string | number;
     ref?: string;
     kind?: "text" | "format" | "printing";
+    /** The changes adopted in this edition, such as "srt-2021". */
+    edition?: string;
+    /** The changes adopted after this edition. Default "1955". */
+    from?: string;
+    /** The changes up to and including this edition. Default "srt-2024". */
+    to?: string;
   }): Promise<VariantsResponse> {
     const params = new URLSearchParams();
     if (options?.paper != null) params.set("paper", String(options.paper));
     if (options?.ref) params.set("ref", options.ref);
     if (options?.kind) params.set("kind", options.kind);
+    if (options?.edition) params.set("edition", options.edition);
+    if (options?.from) params.set("from", options.from);
+    if (options?.to) params.set("to", options.to);
     const qs = params.toString();
     const res = await fetch(`${this.baseUrl}/editions/variants${qs ? `?${qs}` : ""}`, {
       headers: this.headers(),
