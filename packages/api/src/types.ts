@@ -298,7 +298,8 @@ export interface EditionsResponse {
 
 export interface VariantsResponse {
   data: (Variant & { ref: string })[];
-  meta: { total: number };
+  /** `applied`: how many of these changes the default text has. */
+  meta: { total: number; applied: number };
 }
 
 // ─── Entities ───

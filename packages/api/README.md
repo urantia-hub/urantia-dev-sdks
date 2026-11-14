@@ -172,6 +172,8 @@ meta?.edition.label // 'First printing (1955)'
 p.variants // [{ year: 2024, before: 'more than twoscore …', after: 'more than two-score …', … }]
 const { data: editions } = await api.editions.list()
 const { data: changes } = await api.editions.variants({ paper: 98 })
+// Each change between the first printing and srt-2015
+const { data: diff } = await api.editions.variants({ from: '1955', to: 'srt-2015' })
 ```
 
 ## All Endpoints
@@ -185,7 +187,7 @@ const { data: changes } = await api.editions.variants({ paper: 98 })
 | `api.paragraphs.random()` | GET | Random paragraph |
 | `api.paragraphs.context(ref)` | GET | Paragraph with surrounding context |
 | `api.editions.list()` | GET | The editions of the English text, 1955 to 2024 |
-| `api.editions.variants(opts?)` | GET | The changes to the text since 1955 (`{ paper, ref, kind }`) |
+| `api.editions.variants(opts?)` | GET | The changes to the text since 1955 (`{ paper, ref, kind, edition, from, to }`) |
 | `api.search.fullText(params)` | POST | Full-text search across UB paragraphs |
 | `api.search.semantic(params)` | POST | Semantic vector search across UB paragraphs |
 | `api.entities.list(options)` | GET | List entities |
